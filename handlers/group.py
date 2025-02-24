@@ -15,7 +15,7 @@ async def start_group(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     )
     keyboard = [
         [InlineKeyboardButton("Add me to another group", url=f"https://t.me/Madara7_chat_bot?startgroup=true")],
-        [InlineKeyboardButton("Help", url=f"https://t.me/Madara7_chat_bot")]
+        [InlineKeyboardButton("Help", callback_data="help")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     if bot_photo:
@@ -44,7 +44,7 @@ async def stat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         user = update.message.reply_to_message.from_user
         member = await context.bot.get_chat_member(chat.id, user.id)
         messages = "Unknown (API limit)"  # Placeholder
-        bio = user.first_name  # Creative substitute since bio isn’t available
+        bio = user.first_name  # Substitute since bio isn’t available via API
         stat_text = (
             f"*Stats for {user.full_name}*\n"
             f"Username: @{user.username or 'None'}\n"
@@ -57,7 +57,7 @@ async def stat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         user = update.message.from_user
         member = await context.bot.get_chat_member(chat.id, user.id)
         messages = "Unknown (API limit)"  # Placeholder
-        bio = user.first_name  # Creative substitute
+        bio = user.first_name  # Substitute
         stat_text = (
             f"*Your Stats, {user.full_name}!*\n"
             f"Username: @{user.username or 'None'}\n"
@@ -246,7 +246,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         f"*Hey {user.full_name}!*\n"
         "Want the full scoop on my commands? Hit the button below to check them out in my PM!"
     )
-    keyboard = [[InlineKeyboardButton("Command Details", url=f"https://t.me/Madara7_chat_bot")]]
+    keyboard = [[InlineKeyboardButton("Command Details", callback_data="help")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     photo = await get_chat_photo(context.bot, chat.id)
     if photo:

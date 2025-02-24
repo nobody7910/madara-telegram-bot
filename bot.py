@@ -25,9 +25,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     query = update.callback_query
     await query.answer()
     if query.data == "help":
-        await group_help_command(update, context)
-        # Auto-send help in PM when redirected
         user = update.effective_user
+        # Auto-send command summary in PM when "Help" button is clicked
         help_text = (
             f"*Hey {user.full_name}, here’s my command rundown!*\n\n"
             "*PM Commands:*\n"
@@ -50,6 +49,10 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             "*Note:* Some features are simulated due to Telegram limits."
         )
         await context.bot.send_message(chat_id=user.id, text=help_text, parse_mode="Markdown")
+        await query.edit_message_text(
+            text="*Redirected! Check your PM for the full command rundown!*",
+            parse_mode="Markdown"
+        )
 
 async def dummy_server():
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
