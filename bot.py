@@ -35,10 +35,8 @@ async def dummy_server():
     while True:
         await asyncio.sleep(3600)  # Sleep for an hour, keeping the server alive
 
-async def run_bot(application):
-    await application.run_polling(allowed_updates=Update.ALL_TYPES)
-
 async def main() -> None:
+    # Create the application
     application = Application.builder().token(TOKEN).build()
 
     # PM commands
@@ -60,11 +58,12 @@ async def main() -> None:
     application.add_handler(ChatMemberHandler(chat_member_handler, ChatMemberHandler.MY_CHAT_MEMBER))
     application.add_handler(CallbackQueryHandler(button_handler))
 
-    # Run dummy server and bot polling concurrently
-    await asyncio.gather(
-        dummy_server(),
-        run_bot(application)
-    )
+    # Start the bot polling and dummy server concurrently
+    polling_task = asyncio.create_task(application.run_polling(allowed_updates=Update.ALL_TYPES))
+    server_task = asyncio.create_task(dummy_server())
+
+    # Wait for either task to complete (shouldn't happen in normal operation)
+    await asyncio.wait([polling_task, server_task])
 
 if __name__ == "__main__":
     asyncio.run(main())
