@@ -5,13 +5,10 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, ContextTypes, ChatMemberHandler, CallbackQueryHandler, CommandHandler, filters, MessageHandler
 from handlers.pm import start_pm, help_command as pm_help_command, info as pm_info
 from handlers.group import (start_group, stats, members, top, mute, unmute, photo, active, rank, info as group_info, welcome, help_command as group_help_command)
+from message_tracker import track_message  # Import tracking function
 from utils.helpers import get_user_photo, get_chat_photo
-from datetime import datetime
 
-TOKEN = os.environ.get("TOKEN", "7702619386:AAEARRjDuv-ioDB3vRkV2s72oUXZkNVha08")
-
-# In-memory message counter (chat_id -> user_id -> timestamp_list)
-message_counts = {}
+TOKEN = os.environ.get("TOKEN", "YOUR_BOT_TOKEN_HERE")
 
 async def chat_member_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.my_chat_member and update.my_chat_member.new_chat_member.status == "member":
@@ -24,7 +21,6 @@ async def chat_member_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
         keyboard = [[InlineKeyboardButton("See Commands", callback_data="help")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await context.bot.send_message(chat_id=chat.id, text=welcome_text, parse_mode="Markdown", reply_markup=reply_markup)
-    # Handle user joins
     if update.message and update.message.new_chat_members:
         await welcome(update, context)
 
@@ -73,12 +69,7 @@ async def track_messages(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     if update.message and update.message.chat.type in ["group", "supergroup"]:
         chat_id = update.message.chat.id
         user_id = update.message.from_user.id
-        timestamp = datetime.now()
-        if chat_id not in message_counts:
-            message_counts[chat_id] = {}
-        if user_id not in message_counts[chat_id]:
-            message_counts[chat_id][user_id] = []
-        message_counts[chat_id][user_id].append(timestamp)
+        track_message(chat_id, user_id)  # Use function from message_tracker
 
 def main() -> None:
     application = Application.builder().token(TOKEN).build()
