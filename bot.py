@@ -1,14 +1,14 @@
 import asyncio
-from telegram import Update
-from telegram.ext import Application, ContextTypes, ChatMemberHandler, CallbackQueryHandler
+import os
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Application, ContextTypes, ChatMemberHandler, CallbackQueryHandler, CommandHandler, filters
 from handlers.pm import start_pm, help_command, info
 from handlers.group import (start_group, stats, stat, members, top, mute, photo, active, help_command as group_help)
 from utils.helpers import get_user_photo, get_chat_photo
 
-# Replace with your BotFather token
-TOKEN = "7702619386:AAFHjs6Czsz9ocODx4RZ97CPKV47LuOysgo"
+# Use environment variable for token, fallback to placeholder
+TOKEN = os.environ.get("TOKEN", "7702619386:AAFHjs6Czsz9ocODx4RZ97CPKV47LuOysgo")
 
-# Handle bot being added to a group
 async def chat_member_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.my_chat_member and update.my_chat_member.new_chat_member.status == "member":
         chat = update.my_chat_member.chat
@@ -28,7 +28,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await group_help(update, context)
 
 def main() -> None:
-    # Create the Application
     application = Application.builder().token(TOKEN).build()
 
     # PM commands
@@ -51,7 +50,6 @@ def main() -> None:
     application.add_handler(ChatMemberHandler(chat_member_handler, ChatMemberHandler.MY_CHAT_MEMBER))
     application.add_handler(CallbackQueryHandler(button_handler))
 
-    # Run the bot
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
