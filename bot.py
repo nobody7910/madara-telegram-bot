@@ -2,12 +2,15 @@ import asyncio
 import os
 import socket
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, ContextTypes, ChatMemberHandler, CallbackQueryHandler, CommandHandler, filters
+from telegram.ext import Application, ContextTypes, ChatMemberHandler, CallbackQueryHandler, CommandHandler, filters, MessageHandler
 from handlers.pm import start_pm, help_command as pm_help_command, info as pm_info
-from handlers.group import (start_group, stats, stat, members, top, mute, unmute, photo, active, rank, info as group_info, help_command as group_help_command)
+from handlers.group import (start_group, stats, members, top, mute, unmute, photo, active, rank, info as group_info, help_command as group_help_command)
 from utils.helpers import get_user_photo, get_chat_photo
 
-TOKEN = os.environ.get("TOKEN", "7702619386:AAEARRjDuv-ioDB3vRkV2s72oUXZkNVha08")
+TOKEN = os.environ.get("TOKEN", "YOUR_BOT_TOKEN_HERE")
+
+# In-memory message counter (chat_id -> user_id -> count)
+message_counts = {}
 
 async def chat_member_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.my_chat_member and update.my_chat_member.new_chat_member.status == "member":
@@ -26,7 +29,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     await query.answer()
     if query.data == "help":
         user = update.effective_user
-        # Auto-send command summary in PM when "Help" button is clicked
         help_text = (
             f"*Hey {user.full_name}, here’s my command rundown!*\n\n"
             "*PM Commands:*\n"
@@ -35,8 +37,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             "/info@Madara7_chat_bot - Check my uptime\n\n"
             "*Group Commands:*\n"
             "/start@Madara7_chat_bot - A flashy welcome with buttons\n"
-            "/stats@Madara7_chat_bot - Group overview (members, creation date)\n"
-            "/stat@Madara7_chat_bot - User stats (bio, username, etc.; reply or self)\n"
+            "/stats@Madara7_chat_bot - Rank group members by messages\n"
             "/members@Madara7_chat_bot - Total member count\n"
             "/top@Madara7_chat_bot - Rank top 5 admins (simulated activity)\n"
             "/mute@Madara7_chat_bot - Mute a user (admin-only, reply required)\n"
@@ -46,7 +47,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             "/rank@Madara7_chat_bot - Randomly rank a member\n"
             "/info@Madara7_chat_bot - Group bio and invite link (admin-only)\n"
             "/help@Madara7_chat_bot - Redirects you here\n\n"
-            "*Note:* Some features are simulated due to Telegram limits."
+            "*Note:* Message rankings reset when I restart!"
         )
         await context.bot.send_message(chat_id=user.id, text=help_text, parse_mode="Markdown")
         await query.edit_message_text(
@@ -62,6 +63,15 @@ async def dummy_server():
     while True:
         await asyncio.sleep(3600)  # Sleep for an hour, keeping the server alive
 
+async def track_messages(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    # Track messages in groups only
+    if update.message.chat.type in ["group", "supergroup"]:
+        chat_id = update.message.chat.id
+        user_id = update.message.from_user.id
+        if chat_id not in message_counts:
+            message_counts[chat_id] = {}
+        message_counts[chat_id][user_id] = message_counts[chat_id].get(user_id, 0) + 1
+
 def main() -> None:
     application = Application.builder().token(TOKEN).build()
 
@@ -73,7 +83,6 @@ def main() -> None:
     # Group commands
     application.add_handler(CommandHandler("start", start_group, filters=filters.ChatType.GROUPS))
     application.add_handler(CommandHandler("stats", stats, filters=filters.ChatType.GROUPS))
-    application.add_handler(CommandHandler("stat", stat, filters=filters.ChatType.GROUPS))
     application.add_handler(CommandHandler("members", members, filters=filters.ChatType.GROUPS))
     application.add_handler(CommandHandler("top", top, filters=filters.ChatType.GROUPS))
     application.add_handler(CommandHandler("mute", mute, filters=filters.ChatType.GROUPS))
@@ -83,6 +92,13 @@ def main() -> None:
     application.add_handler(CommandHandler("rank", rank, filters=filters.ChatType.GROUPS))
     application.add_handler(CommandHandler("info", group_info, filters=filters.ChatType.GROUPS))
     application.add_handler(CommandHandler("help", group_help_command, filters=filters.ChatType.GROUPS))
+
+    # Dual-purpose info command (PM and group)
+    application.add_handler(CommandHandler("info", pm_info, filters=filters.ChatType.PRIVATE))
+    application.add_handler(CommandHandler("info", group_info, filters=filters.ChatType.GROUPS))
+
+    # Message tracking for /stats
+    application.add_handler(MessageHandler(filters.ALL & filters.ChatType.GROUPS, track_messages))
 
     application.add_handler(ChatMemberHandler(chat_member_handler, ChatMemberHandler.MY_CHAT_MEMBER))
     application.add_handler(CallbackQueryHandler(button_handler))

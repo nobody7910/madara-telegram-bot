@@ -3,6 +3,7 @@ from telegram.ext import ContextTypes
 from utils.helpers import get_user_photo, get_chat_photo
 from datetime import datetime
 import random
+from bot import message_counts  # Import message counter from bot.py
 
 async def start_group(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     bot = context.bot
@@ -25,52 +26,28 @@ async def start_group(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat = update.message.chat
-    member_count = await context.bot.get_chat_member_count(chat.id)
-    creation_date = datetime.fromtimestamp(chat.id / (1 << 32)).strftime('%Y-%m-%d')
-    photo = await get_chat_photo(context.bot, chat.id)
-    stats_text = (
-        f"*Group: {chat.title}*\n"
-        f"Members: {member_count}\n"
-        f"Created: {creation_date} (approx)"
-    )
+    chat_id = chat.id
+    photo = await get_chat_photo(context.bot, chat_id)
+    
+    # Get message counts for this chat
+    if chat_id in message_counts and message_counts[chat_id]:
+        ranked_users = sorted(message_counts[chat_id].items(), key=lambda x: x[1], reverse=True)[:5]  # Top 5 by message count
+        stats_text = f"*🏆 Message Rankings in {chat.title} 🏆*\n\n"
+        for i, (user_id, count) in enumerate(ranked_users, 1):
+            try:
+                member = await context.bot.get_chat_member(chat_id, user_id)
+                user = member.user
+                stats_text += f"{i}. {user.full_name} (@{user.username or 'No username'}) - Messages: {count}\n"
+            except:
+                stats_text += f"{i}. Unknown User (ID: {user_id}) - Messages: {count}\n"
+        stats_text += "\n*Note:* Counts reset when I restart—chat away to climb the ranks!"
+    else:
+        stats_text = f"*No messages tracked in {chat.title} yet!*\nStart chatting to see rankings!"
+    
     if photo:
         await update.message.reply_photo(photo=photo, caption=stats_text, parse_mode="Markdown")
     else:
         await update.message.reply_text(stats_text, parse_mode="Markdown")
-
-async def stat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    chat = update.message.chat
-    if update.message.reply_to_message:
-        user = update.message.reply_to_message.from_user
-        member = await context.bot.get_chat_member(chat.id, user.id)
-        messages = "Unknown (API limit)"  # Placeholder
-        bio = user.first_name  # Substitute since bio isn’t available via API
-        stat_text = (
-            f"*Stats for {user.full_name}*\n"
-            f"Username: @{user.username or 'None'}\n"
-            f"ID: {user.id}\n"
-            f"Status: {member.status}\n"
-            f"Messages: {messages}\n"
-            f"Bio: {bio}"
-        )
-    else:
-        user = update.message.from_user
-        member = await context.bot.get_chat_member(chat.id, user.id)
-        messages = "Unknown (API limit)"  # Placeholder
-        bio = user.first_name  # Substitute
-        stat_text = (
-            f"*Your Stats, {user.full_name}!*\n"
-            f"Username: @{user.username or 'None'}\n"
-            f"ID: {user.id}\n"
-            f"Status: {member.status}\n"
-            f"Messages: {messages}\n"
-            f"Bio: {bio}"
-        )
-    photo = await get_user_photo(context.bot, user.id)
-    if photo:
-        await update.message.reply_photo(photo=photo, caption=stat_text, parse_mode="Markdown")
-    else:
-        await update.message.reply_text(stat_text, parse_mode="Markdown")
 
 async def members(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat = update.message.chat
