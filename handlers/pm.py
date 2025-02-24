@@ -22,23 +22,23 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     user = update.message.from_user
     photo = await get_user_photo(context.bot, user.id)
     help_text = (
-        f"*Hey {user.full_name}, here’s what I can do:*\n\n"
+        f"*Hey {user.full_name}, here’s my command arsenal!*\n\n"
         "*PM Commands:*\n"
         "/start@Madara7_chat_bot - Get my intro and a group-add button\n"
-        "/help@Madara7_chat_bot - See this detailed command list\n"
-        "/info@Madara7_chat_bot - Check my uptime\n\n"
+        "/help@Madara7_chat_bot - See this detailed command rundown\n"
+        "/info@Madara7_chat_bot - Check how long I’ve been awake\n\n"
         "*Group Commands:*\n"
-        "/start@Madara7_chat_bot - A fun welcome with my pic\n"
-        "/stats@Madara7_chat_bot - Show group stats (members, creation date)\n"
-        "/stat@Madara7_chat_bot - Display a user’s stats (reply or self)\n"
-        "/members@Madara7_chat_bot - Total member count\n"
-        "/top@Madara7_chat_bot - Rank top 5 members by messages (simulated)\n"
-        "/mute@Madara7_chat_bot - Mute a user (reply required, needs admin rights)\n"
-        "/photo@Madara7_chat_bot - Show profile pics (reply or self)\n"
+        "/start@Madara7_chat_bot - A flashy welcome with my pic and buttons\n"
+        "/stats@Madara7_chat_bot - Group overview (members, creation date)\n"
+        "/stat@Madara7_chat_bot - User stats (username, ID, status, join date, etc.; reply or self)\n"
+        "/members@Madara7_chat_bot - Total member count in the group\n"
+        "/top@Madara7_chat_bot - Rank top 5 members (simulated messages)\n"
+        "/mute@Madara7_chat_bot - Silence a user (reply required, needs admin rights)\n"
+        "/photo@Madara7_chat_bot - Show profile pics (reply or self, up to 5)\n"
         "/active@Madara7_chat_bot - List top 3 active members (simulated)\n"
-        "/rank@Madara7_chat_bot - Rank a random member\n"
-        "/help@Madara7_chat_bot - Redirects to this PM list\n\n"
-        "*Note:* Message counts are simulated until tracking is added!"
+        "/rank@Madara7_chat_bot - Randomly rank a member with flair\n"
+        "/help@Madara7_chat_bot - Redirects you here for the full scoop\n\n"
+        "*Note:* Some features (e.g., message counts) are simulated due to Telegram limits."
     )
     if photo:
         await update.message.reply_photo(photo=photo, caption=help_text, parse_mode="Markdown")

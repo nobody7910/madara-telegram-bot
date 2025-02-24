@@ -7,7 +7,7 @@ from handlers.pm import start_pm, help_command as pm_help_command, info
 from handlers.group import (start_group, stats, stat, members, top, mute, photo, active, rank, help_command as group_help_command)
 from utils.helpers import get_user_photo, get_chat_photo
 
-TOKEN = os.environ.get("TOKEN", "7702619386:AAEARRjDuv-ioDB3vRkV2s72oUXZkNVha08")
+TOKEN = os.environ.get("TOKEN", "YOUR_BOT_TOKEN_HERE")
 
 async def chat_member_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.my_chat_member and update.my_chat_member.new_chat_member.status == "member":

@@ -7,16 +7,21 @@ import random
 async def start_group(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     bot = context.bot
     chat = update.message.chat
-    bot_photo = await get_user_photo(bot, bot.id)  # Get bot's profile pic
+    bot_photo = await get_user_photo(bot, bot.id)  # Bot's profile pic
     intro_text = (
         f"🎉 *Greetings, {chat.title}!* 🎉\n"
         "I’m @Madara7_chat_bot, your group’s new MVP.\n"
-        "Stats, ranks, and fun—type /help@Madara7_chat_bot to see what I can do!"
+        "Stats, ranks, and fun—ready to roll!"
     )
+    keyboard = [
+        [InlineKeyboardButton("Add me to another group", url=f"https://t.me/Madara7_chat_bot?startgroup=true")],
+        [InlineKeyboardButton("Help", url=f"https://t.me/Madara7_chat_bot")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
     if bot_photo:
-        await update.message.reply_photo(photo=bot_photo, caption=intro_text, parse_mode="Markdown")
+        await update.message.reply_photo(photo=bot_photo, caption=intro_text, parse_mode="Markdown", reply_markup=reply_markup)
     else:
-        await update.message.reply_text(intro_text, parse_mode="Markdown")
+        await update.message.reply_text(intro_text, parse_mode="Markdown", reply_markup=reply_markup)
 
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat = update.message.chat
@@ -39,25 +44,27 @@ async def stat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         user = update.message.reply_to_message.from_user
         member = await context.bot.get_chat_member(chat.id, user.id)
         messages = "Unknown (API limit)"  # Placeholder
+        join_date = member.until_date or "Unknown"  # Approximation within API limits
         photo = await get_user_photo(context.bot, user.id)
         stat_text = (
             f"*Stats for {user.full_name}*\n"
             f"Username: @{user.username or 'None'}\n"
             f"ID: {user.id}\n"
             f"Status: {member.status}\n"
-            f"Total Messages: {messages}"
+            f"Join Date: {join_date}"
         )
     else:
         user = update.message.from_user
         member = await context.bot.get_chat_member(chat.id, user.id)
         messages = "Unknown (API limit)"  # Placeholder
+        join_date = member.until_date or "Unknown"  # Approximation within API limits
         photo = await get_user_photo(context.bot, user.id)
         stat_text = (
             f"*Your Stats, {user.full_name}!*\n"
             f"Username: @{user.username or 'None'}\n"
             f"ID: {user.id}\n"
             f"Status: {member.status}\n"
-            f"Total Messages: {messages}"
+            f"Join Date: {join_date}"
         )
     if photo:
         await update.message.reply_photo(photo=photo, caption=stat_text, parse_mode="Markdown")
@@ -71,7 +78,6 @@ async def members(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def top(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat = update.message.chat
-    # Simulate top members
     members = await context.bot.get_chat_administrators(chat.id)  # Use admins as proxy
     random.shuffle(members)  # Randomize for simulation
     top_text = f"*🏆 Top Members in {chat.title} 🏆*\n\n"
@@ -122,7 +128,6 @@ async def photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def active(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat = update.message.chat
-    # Simulate top 3 active members
     members = await context.bot.get_chat_administrators(chat.id)  # Use admins as proxy
     random.shuffle(members)  # Randomize for simulation
     active_text = f"*🌟 Top 3 Active Members in {chat.title} 🌟*\n"
@@ -139,7 +144,6 @@ async def active(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def rank(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat = update.message.chat
-    # Randomly rank a member
     members = await context.bot.get_chat_member_count(chat.id)
     if members > 1:
         random_member = await context.bot.get_chat_member(chat.id, random.choice(await context.bot.get_chat_administrators(chat.id)).user.id)
@@ -163,9 +167,9 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     user = update.message.from_user
     help_text = (
         f"*Hey {user.full_name}!*\n"
-        "Want to know my powers? Check your PM for the full command list!"
+        "Want the full scoop on my commands? Hit the button below to check them out in my PM!"
     )
-    keyboard = [[InlineKeyboardButton("See Commands in PM", url=f"https://t.me/Madara7_chat_bot?start=help")]]
+    keyboard = [[InlineKeyboardButton("Command Details", url=f"https://t.me/Madara7_chat_bot")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     photo = await get_chat_photo(context.bot, chat.id)
     if photo:
