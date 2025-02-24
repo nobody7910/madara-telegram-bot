@@ -1,12 +1,13 @@
 import asyncio
 import os
+import socket
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, ContextTypes, ChatMemberHandler, CallbackQueryHandler, CommandHandler, filters
 from handlers.pm import start_pm, help_command, info
 from handlers.group import (start_group, stats, stat, members, top, mute, photo, active, help_command as group_help)
 from utils.helpers import get_user_photo, get_chat_photo
 
-TOKEN = os.environ.get("TOKEN", "YOUR_BOT_TOKEN_HERE")
+TOKEN = os.environ.get("TOKEN", "7702619386:AAEARRjDuv-ioDB3vRkV2s72oUXZkNVha08")
 
 async def chat_member_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.my_chat_member and update.my_chat_member.new_chat_member.status == "member":
@@ -26,7 +27,15 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     if query.data == "help":
         await group_help(update, context)
 
-def main() -> None:
+async def dummy_server():
+    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server.bind(("0.0.0.0", 8000))  # Listen on port 8000 for Koyeb health check
+    server.listen(1)
+    print("Dummy server started on port 8000")
+    while True:
+        await asyncio.sleep(1)  # Non-blocking loop to keep server alive
+
+async def main() -> None:
     application = Application.builder().token(TOKEN).build()
 
     # PM commands
@@ -48,7 +57,11 @@ def main() -> None:
     application.add_handler(ChatMemberHandler(chat_member_handler, ChatMemberHandler.MY_CHAT_MEMBER))
     application.add_handler(CallbackQueryHandler(button_handler))
 
-    application.run_polling(allowed_updates=Update.ALL_TYPES)
+    # Run dummy server and polling concurrently
+    await asyncio.gather(
+        dummy_server(),
+        application.run_polling(allowed_updates=Update.ALL_TYPES)
+    )
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
