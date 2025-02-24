@@ -64,7 +64,7 @@ async def stat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 async def members(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat = update.message.chat
     count = await context.bot.get_chat_member_count(chat.id)
-    photo = await get_chat_photo(context.bot, chat.id)
+    await update.message.reply_text(f"*Total members in {chat.title}:* {count}", parse_mode="Markdown")
     if photo:
         await update.message.reply_photo(photo=photo, caption=f"*Total members in {chat.title}:* {count}", parse_mode="Markdown")
     else:
