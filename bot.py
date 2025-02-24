@@ -7,7 +7,7 @@ from handlers.pm import start_pm, help_command, info
 from handlers.group import (start_group, stats, stat, members, top, mute, photo, active, help_command as group_help)
 from utils.helpers import get_user_photo, get_chat_photo
 
-TOKEN = os.environ.get("TOKEN", "7702619386:AAEARRjDuv-ioDB3vRkV2s72oUXZkNVha08")
+TOKEN = os.environ.get("TOKEN", "YOUR_BOT_TOKEN_HERE")
 
 async def chat_member_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.my_chat_member and update.my_chat_member.new_chat_member.status == "member":
@@ -33,7 +33,10 @@ async def dummy_server():
     server.listen(1)
     print("Dummy server started on port 8000")
     while True:
-        await asyncio.sleep(1)  # Non-blocking loop to keep server alive
+        await asyncio.sleep(3600)  # Sleep for an hour, keeping the server alive
+
+async def run_bot(application):
+    await application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 async def main() -> None:
     application = Application.builder().token(TOKEN).build()
@@ -57,10 +60,10 @@ async def main() -> None:
     application.add_handler(ChatMemberHandler(chat_member_handler, ChatMemberHandler.MY_CHAT_MEMBER))
     application.add_handler(CallbackQueryHandler(button_handler))
 
-    # Run dummy server and polling concurrently
+    # Run dummy server and bot polling concurrently
     await asyncio.gather(
         dummy_server(),
-        application.run_polling(allowed_updates=Update.ALL_TYPES)
+        run_bot(application)
     )
 
 if __name__ == "__main__":
