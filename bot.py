@@ -27,7 +27,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     if query.data == "help":
         await group_help(update, context)
 
-async def dummy_server():
+async def dummy_server(loop):
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.bind(("0.0.0.0", 8000))  # Listen on port 8000 for Koyeb health check
     server.listen(1)
@@ -58,8 +58,11 @@ def main() -> None:
     application.add_handler(ChatMemberHandler(chat_member_handler, ChatMemberHandler.MY_CHAT_MEMBER))
     application.add_handler(CallbackQueryHandler(button_handler))
 
-    # Start the dummy server as a background task
-    asyncio.ensure_future(dummy_server())
+    # Get the event loop
+    loop = asyncio.get_event_loop()
+
+    # Start the dummy server as a persistent background task
+    loop.create_task(dummy_server(loop))
 
     # Run polling in the main loop
     application.run_polling(allowed_updates=Update.ALL_TYPES)
