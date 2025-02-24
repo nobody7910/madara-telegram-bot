@@ -43,29 +43,28 @@ async def stat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.message.reply_to_message:
         user = update.message.reply_to_message.from_user
         member = await context.bot.get_chat_member(chat.id, user.id)
-        user_profile = await context.bot.get_user_profile_photos(user.id, limit=1)  # For bio (not directly available)
-        bio = "Not available"  # Telegram API doesn’t provide bio directly
         messages = "Unknown (API limit)"  # Placeholder
+        bio = user.first_name  # Creative substitute since bio isn’t available
         stat_text = (
             f"*Stats for {user.full_name}*\n"
             f"Username: @{user.username or 'None'}\n"
             f"ID: {user.id}\n"
             f"Status: {member.status}\n"
-            f"Bio: {bio}\n"
-            f"Handle: @{user.username or 'No username'}"
+            f"Messages: {messages}\n"
+            f"Bio: {bio}"
         )
     else:
         user = update.message.from_user
         member = await context.bot.get_chat_member(chat.id, user.id)
-        bio = "Not available"  # Placeholder
         messages = "Unknown (API limit)"  # Placeholder
+        bio = user.first_name  # Creative substitute
         stat_text = (
             f"*Your Stats, {user.full_name}!*\n"
             f"Username: @{user.username or 'None'}\n"
             f"ID: {user.id}\n"
             f"Status: {member.status}\n"
-            f"Bio: {bio}\n"
-            f"Handle: @{user.username or 'No username'}"
+            f"Messages: {messages}\n"
+            f"Bio: {bio}"
         )
     photo = await get_user_photo(context.bot, user.id)
     if photo:
@@ -82,10 +81,10 @@ async def top(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat = update.message.chat
     members = await context.bot.get_chat_administrators(chat.id)  # Use admins as proxy
     random.shuffle(members)  # Randomize for simulation
-    top_text = f"*🏆 Top Members in {chat.title} 🏆*\n\n"
+    top_text = f"*🏆 Top Admins in {chat.title} 🏆*\n\n"
     for i, member in enumerate(members[:5], 1):  # Top 5
-        top_text += f"{i}. {member.user.full_name} (@{member.user.username or 'No username'}) - Messages: {random.randint(50, 200)}\n"
-    top_text += "\n*Note: Message counts are simulated until tracking is added!*"
+        top_text += f"{i}. {member.user.full_name} (@{member.user.username or 'No username'}) - Activity: {random.randint(50, 200)} (simulated)\n"
+    top_text += "\n*Note: Activity is simulated until tracking is added!*"
     photo = await get_chat_photo(context.bot, chat.id)
     if photo:
         await update.message.reply_photo(photo=photo, caption=top_text, parse_mode="Markdown")
@@ -101,14 +100,26 @@ async def mute(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return
     if update.message.reply_to_message:
         target_user = update.message.reply_to_message.from_user
+        target_member = await context.bot.get_chat_member(chat.id, target_user.id)
+        if target_member.status in ["administrator", "creator"]:
+            await update.message.reply_text(
+                "*Ooo u stupid, I can’t mute an admin!*\n"
+                "Even I, @Madara7_chat_bot, know better than to mess with the big shots!",
+                parse_mode="Markdown"
+            )
+            return
         bot_member = await context.bot.get_chat_member(chat.id, context.bot.id)
         if bot_member.can_restrict_members:
             await context.bot.restrict_chat_member(chat.id, target_user.id, permissions=ChatPermissions(can_send_messages=False))
             photo = await get_user_photo(context.bot, target_user.id)
+            mute_text = (
+                f"*Muted {target_user.full_name}!*\n"
+                "Silence is golden, and I’ve just handed out some gold! 🎤✨"
+            )
             if photo:
-                await update.message.reply_photo(photo=photo, caption=f"*Muted {target_user.full_name}!*", parse_mode="Markdown")
+                await update.message.reply_photo(photo=photo, caption=mute_text, parse_mode="Markdown")
             else:
-                await update.message.reply_text(f"*Muted {target_user.full_name}!*", parse_mode="Markdown")
+                await update.message.reply_text(mute_text, parse_mode="Markdown")
         else:
             await update.message.reply_text("*I need admin rights to mute users!*", parse_mode="Markdown")
     else:
@@ -123,14 +134,26 @@ async def unmute(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return
     if update.message.reply_to_message:
         target_user = update.message.reply_to_message.from_user
+        target_member = await context.bot.get_chat_member(chat.id, target_user.id)
+        if target_member.status in ["administrator", "creator"]:
+            await update.message.reply_text(
+                "*Ooo u silly goose, I can’t unmute an admin!*\n"
+                "They’re too cool to be muted anyway! 😎",
+                parse_mode="Markdown"
+            )
+            return
         bot_member = await context.bot.get_chat_member(chat.id, context.bot.id)
         if bot_member.can_restrict_members:
             await context.bot.restrict_chat_member(chat.id, target_user.id, permissions=ChatPermissions(can_send_messages=True))
             photo = await get_user_photo(context.bot, target_user.id)
+            unmute_text = (
+                f"*Unmuted {target_user.full_name}!*\n"
+                "The gag’s off—let the chatter begin anew! 🗣️🎉"
+            )
             if photo:
-                await update.message.reply_photo(photo=photo, caption=f"*Unmuted {target_user.full_name}!*", parse_mode="Markdown")
+                await update.message.reply_photo(photo=photo, caption=unmute_text, parse_mode="Markdown")
             else:
-                await update.message.reply_text(f"*Unmuted {target_user.full_name}!*", parse_mode="Markdown")
+                await update.message.reply_text(unmute_text, parse_mode="Markdown")
         else:
             await update.message.reply_text("*I need admin rights to unmute users!*", parse_mode="Markdown")
     else:
@@ -157,14 +180,13 @@ async def photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def active(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat = update.message.chat
-    members = await context.bot.get_chat_administrators(chat.id)  # Use admins as proxy
-    random.shuffle(members)  # Randomize for simulation
-    active_text = f"*🌟 Top 3 Active Members in {chat.title} 🌟*\n"
-    active_text += "----------------------------------------\n"
-    for i, member in enumerate(members[:3], 1):
-        active_text += f"#{i} | {member.user.full_name} (@{member.user.username or 'No username'}) | Msgs: {random.randint(20, 100)}\n"
-    active_text += "----------------------------------------\n"
-    active_text += "*Note: Based on simulated activity until tracking is added!*"
+    member_count = await context.bot.get_chat_member_count(chat.id)
+    active_text = (
+        f"*🌟 Activity Status of {chat.title} 🌟*\n"
+        f"Total Members: {member_count}\n"
+        f"Active Vibes: {random.randint(int(member_count * 0.5), member_count)} members buzzing around! (simulated)\n"
+        "*Note:* Exact active counts aren’t available—enjoy the vibe check instead!"
+    )
     photo = await get_chat_photo(context.bot, chat.id)
     if photo:
         await update.message.reply_photo(photo=photo, caption=active_text, parse_mode="Markdown")
@@ -193,26 +215,29 @@ async def rank(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def info(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat = update.message.chat
+    user = update.message.from_user
+    caller = await context.bot.get_chat_member(chat.id, user.id)
+    if not (caller.status in ["administrator", "creator"]):
+        await update.message.reply_text("*Only admins can use /info@Madara7_chat_bot in group!*", parse_mode="Markdown")
+        return
     photo = await get_chat_photo(context.bot, chat.id)
     bio = chat.description or "No bio set"
-    if chat.type == "group" and chat.username:  # Public group
-        invite_link = f"https://t.me/{chat.username}"
-    else:  # Private group
-        bot_member = await context.bot.get_chat_member(chat.id, context.bot.id)
-        if bot_member.can_invite_users:
-            invite_link = await context.bot.create_chat_invite_link(chat.id, name=f"Invite to {chat.title}")
-            invite_link = invite_link.invite_link
-        else:
-            invite_link = "I need admin rights to generate an invite link!"
+    bot_member = await context.bot.get_chat_member(chat.id, context.bot.id)
+    if bot_member.can_invite_users:
+        invite_link = await context.bot.create_chat_invite_link(chat.id, name=f"Invite to {chat.title}")
+        invite_button = [[InlineKeyboardButton("Join Group", url=invite_link.invite_link)]]
+        reply_markup = InlineKeyboardMarkup(invite_button)
+    else:
+        reply_markup = None
+        bio += "\n*Invite Link:* I need admin rights to generate one!"
     info_text = (
-        f"*Info for {chat.title}*\n"
-        f"Bio: {bio}\n"
-        f"Invite Link: {invite_link}"
+        f"*Group: {chat.title}*\n"
+        f"Bio: {bio}"
     )
     if photo:
-        await update.message.reply_photo(photo=photo, caption=info_text, parse_mode="Markdown")
+        await update.message.reply_photo(photo=photo, caption=info_text, parse_mode="Markdown", reply_markup=reply_markup)
     else:
-        await update.message.reply_text(info_text, parse_mode="Markdown")
+        await update.message.reply_text(info_text, parse_mode="Markdown", reply_markup=reply_markup)
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat = update.message.chat

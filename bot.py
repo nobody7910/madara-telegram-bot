@@ -4,7 +4,7 @@ import socket
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, ContextTypes, ChatMemberHandler, CallbackQueryHandler, CommandHandler, filters
 from handlers.pm import start_pm, help_command as pm_help_command, info as pm_info
-from handlers.group import (start_group, stats, stat, members, top, mute, unmute, photo, active, rank, help_command as group_help_command, info as group_info)
+from handlers.group import (start_group, stats, stat, members, top, mute, unmute, photo, active, rank, info as group_info, help_command as group_help_command)
 from utils.helpers import get_user_photo, get_chat_photo
 
 TOKEN = os.environ.get("TOKEN", "7702619386:AAEARRjDuv-ioDB3vRkV2s72oUXZkNVha08")
@@ -39,13 +39,13 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             "/stats@Madara7_chat_bot - Group overview (members, creation date)\n"
             "/stat@Madara7_chat_bot - User stats (bio, username, etc.; reply or self)\n"
             "/members@Madara7_chat_bot - Total member count\n"
-            "/top@Madara7_chat_bot - Rank top 5 members (simulated)\n"
+            "/top@Madara7_chat_bot - Rank top 5 admins (simulated activity)\n"
             "/mute@Madara7_chat_bot - Mute a user (admin-only, reply required)\n"
             "/unmute@Madara7_chat_bot - Unmute a user (admin-only, reply required)\n"
             "/photo@Madara7_chat_bot - Show profile pics (reply or self, up to 5)\n"
-            "/active@Madara7_chat_bot - List top 3 active members (simulated)\n"
+            "/active@Madara7_chat_bot - Show group activity status\n"
             "/rank@Madara7_chat_bot - Randomly rank a member\n"
-            "/info@Madara7_chat_bot - Group bio and invite link\n"
+            "/info@Madara7_chat_bot - Group bio and invite link (admin-only)\n"
             "/help@Madara7_chat_bot - Redirects you here\n\n"
             "*Note:* Some features are simulated due to Telegram limits."
         )
