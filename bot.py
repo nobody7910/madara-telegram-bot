@@ -7,7 +7,7 @@ from handlers.group import (start_group, stats, stat, members, top, mute, photo,
 from utils.helpers import get_user_photo, get_chat_photo
 
 # Use environment variable for token, fallback to placeholder
-TOKEN = os.environ.get("TOKEN", "7702619386:AAFHjs6Czsz9ocODx4RZ97CPKV47LuOysgo")
+TOKEN = os.environ.get("TOKEN", "7702619386:AAEARRjDuv-ioDB3vRkV2s72oUXZkNVha08")
 
 async def chat_member_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.my_chat_member and update.my_chat_member.new_chat_member.status == "member":
