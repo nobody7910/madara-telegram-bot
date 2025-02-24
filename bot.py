@@ -8,7 +8,7 @@ from handlers.group import (start_group, stats, members, top, mute, unmute, phot
 from message_tracker import track_message  # Import tracking function
 from utils.helpers import get_user_photo, get_chat_photo
 
-TOKEN = os.environ.get("TOKEN", "YOUR_BOT_TOKEN_HERE")
+TOKEN = os.environ.get("TOKEN", "7702619386:AAEARRjDuv-ioDB3vRkV2s72oUXZkNVha08")
 
 async def chat_member_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.my_chat_member and update.my_chat_member.new_chat_member.status == "member":

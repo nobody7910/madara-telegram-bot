@@ -3,7 +3,7 @@ from telegram.ext import ContextTypes
 from utils.helpers import get_user_photo, get_chat_photo
 from datetime import datetime, timedelta
 import random
-from bot import message_counts  # Import message counter from bot.py
+from message_tracker import get_message_counts  # Correct import from message_tracker.py
 
 async def start_group(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     bot = context.bot
@@ -30,8 +30,9 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.message.from_user
     
     # Get message timestamps for this user in this chat
-    if chat_id in message_counts and user.id in message_counts[chat_id]:
-        timestamps = message_counts[chat_id][user.id]
+    message_data = get_message_counts(chat_id)
+    if user.id in message_data:
+        timestamps = message_data[user.id]
         now = datetime.now()
         
         # Calculate message counts for different time periods
@@ -81,8 +82,9 @@ async def top(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     photo = await get_chat_photo(context.bot, chat_id)
     
     # Get message counts for this chat
-    if chat_id in message_counts and message_counts[chat_id]:
-        ranked_users = sorted(message_counts[chat_id].items(), key=lambda x: len(x[1]), reverse=True)[:5]  # Top 5 by message count
+    message_data = get_message_counts(chat_id)
+    if message_data:
+        ranked_users = sorted(message_data.items(), key=lambda x: len(x[1]), reverse=True)[:5]  # Top 5 by message count
         top_text = f"*🌟 Top 5 Active Members in {chat.title} 🌟*\n\n"
         top_text += "----------------------------------------\n"
         for i, (user_id, timestamps) in enumerate(ranked_users, 1):
@@ -249,6 +251,7 @@ async def info(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat = update.message.chat
+    chat_id = chat.id
     for new_member in update.message.new_chat_members:
         photo = await get_user_photo(context.bot, new_member.id)
         welcome_text = (
@@ -260,19 +263,4 @@ async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if photo:
             await context.bot.send_photo(chat_id=chat_id, photo=photo, caption=welcome_text, parse_mode="Markdown")
         else:
-            await context.bot.send_message(chat_id=chat_id, text=welcome_text, parse_mode="Markdown")
-
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    chat = update.message.chat
-    user = update.message.from_user
-    help_text = (
-        f"*Hey {user.full_name}!*\n"
-        "Want the full scoop on my commands? Hit the button below to check them out in my PM!"
-    )
-    keyboard = [[InlineKeyboardButton("Command Details", callback_data="help")]]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    photo = await get_chat_photo(context.bot, chat.id)
-    if photo:
-        await update.message.reply_photo(photo=photo, caption=help_text, parse_mode="Markdown", reply_markup=reply_markup)
-    else:
-        await update.message.reply_text(help_text, parse_mode="Markdown", reply_markup=reply_markup)
+            await context.bot
