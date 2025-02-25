@@ -14,7 +14,7 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 logger = logging.getLogger(__name__)
 
 # Use a new, valid token from BotFather
-TOKEN = "7702619386:AAG9rTm-56_aEkCV8Baqi9g42JWXt06C94E"  # Replace with your new token
+TOKEN = "7702619386:AAEXCt9dt3SfcW5xZN4FKN77jr0HURovZS0"  # Replace with your new token
 
 async def chat_member_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.my_chat_member and update.my_chat_member.new_chat_member.status == "member":
