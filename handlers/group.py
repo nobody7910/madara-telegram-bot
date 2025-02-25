@@ -180,6 +180,10 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             InlineKeyboardButton("This Month", callback_data="stat_month"),
         ]
     ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    # Edit the original message
+    await query.edit_message_text(leaderboard_text, reply_markup=reply_markup, parse_mode='Markdown')
 
 async def members(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat = update.message.chat
@@ -322,7 +326,7 @@ async def rank(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     else:
         await update.message.reply_text("*Not enough members to rank!*", parse_mode="Markdown")
 
-async def def info(update, context):
+async def info(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat = update.effective_chat
     message = update.effective_message
 
