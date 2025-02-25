@@ -7,18 +7,28 @@ from telegram.ext import ContextTypes
 async def start_pm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
     args = context.args
+    photo = await get_user_photo(context.bot, user.id)  # Fetch photo first
+    intro_text = f"Hi {user.first_name}! I'm @Madara7_chat_bot. Use /help for commands."
+
     if args and args[0] == "help":
         await send_help_summary(update, context, user)
     else:
-        # Keep your original start_pm behavior here
-        await update.message.reply_text(f"Hi {user.first_name}! I’m @Madara7_chat_bot. Use /help for commands.")
-    )
-    keyboard = [[InlineKeyboardButton("Add me to a group", url=f"https://t.me/Madara7_chat_bot?startgroup=true")]]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    if photo:
-        await update.message.reply_photo(photo=photo, caption=intro_text, parse_mode="Markdown", reply_markup=reply_markup)
-    else:
-        await update.message.reply_text(intro_text, parse_mode="Markdown", reply_markup=reply_markup)
+        keyboard = [[InlineKeyboardButton("Add me to a group", url="https://t.me/Madara7_chat_bot?startgroup=true")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        if photo:
+            await update.message.reply_photo(
+                photo=photo,
+                caption=intro_text,
+                parse_mode="Markdown",
+                reply_markup=reply_markup
+            )
+        else:
+            await update.message.reply_text(
+                intro_text,
+                parse_mode="Markdown",
+                reply_markup=reply_markup
+            )
 
 async def send_help_summary(update: Update, context: ContextTypes.DEFAULT_TYPE, user) -> None:
     summary_text = (
