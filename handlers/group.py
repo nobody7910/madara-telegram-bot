@@ -1,9 +1,8 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ChatPermissions
 from telegram.ext import ContextTypes
 from utils.helpers import get_user_photo, get_chat_photo
-from datetime import datetime, timedelta
+from datetime import datetime
 import random
-from message_tracker import get_message_counts  # Correct import from message_tracker.py
 
 async def start_group(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     bot = context.bot
@@ -26,43 +25,48 @@ async def start_group(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat = update.message.chat
-    chat_id = chat.id
-    user = update.message.from_user
-    
-    # Get message timestamps for this user in this chat
-    message_data = get_message_counts(chat_id)
-    if user.id in message_data:
-        timestamps = message_data[user.id]
-        now = datetime.now()
-        
-        # Calculate message counts for different time periods
-        today = len([t for t in timestamps if t.date() == now.date()])
-        yesterday = len([t for t in timestamps if t.date() == (now - timedelta(days=1)).date()])
-        this_week = len([t for t in timestamps if t > now - timedelta(days=7)])
-        this_month = len([t for t in timestamps if t > now - timedelta(days=30)])
-        this_year = len([t for t in timestamps if t > now - timedelta(days=365)])
-        
-        photo = await get_user_photo(context.bot, user.id)
+    member_count = await context.bot.get_chat_member_count(chat.id)
+    creation_date = datetime.fromtimestamp(chat.id / (1 << 32)).strftime('%Y-%m-%d')
+    photo = await get_chat_photo(context.bot, chat.id)
+    stats_text = (
+        f"*Group: {chat.title}*\n"
+        f"Members: {member_count}\n"
+        f"Created: {creation_date} (approx)"
+    )
+    if photo:
+        await update.message.reply_photo(photo=photo, caption=stats_text, parse_mode="Markdown")
+    else:
+        await update.message.reply_text(stats_text, parse_mode="Markdown")
+
+async def stat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    chat = update.message.chat
+    if update.message.reply_to_message:
+        user = update.message.reply_to_message.from_user
+        member = await context.bot.get_chat_member(chat.id, user.id)
+        messages = "Unknown (API limit)"  # Placeholder
+        bio = user.first_name  # Substitute since bio isn’t available via API
         stat_text = (
-            f"*Here are the stats for {user.full_name}*\n"
+            f"*Stats for {user.full_name}*\n"
             f"Username: @{user.username or 'None'}\n"
             f"ID: {user.id}\n"
-            f"Messages Today: {today}\n"
-            f"Messages Yesterday: {yesterday}\n"
-            f"Messages This Week: {this_week}\n"
-            f"Messages This Month: {this_month}\n"
-            f"Messages This Year: {this_year}\n"
-            "*Note:* Stats reset when I restart—keep chatting!"
+            f"Status: {member.status}\n"
+            f"Messages: {messages}\n"
+            f"Bio: {bio}"
         )
     else:
-        photo = await get_user_photo(context.bot, user.id)
+        user = update.message.from_user
+        member = await context.bot.get_chat_member(chat.id, user.id)
+        messages = "Unknown (API limit)"  # Placeholder
+        bio = user.first_name  # Substitute
         stat_text = (
-            f"*Here are the stats for {user.full_name}*\n"
+            f"*Your Stats, {user.full_name}!*\n"
             f"Username: @{user.username or 'None'}\n"
             f"ID: {user.id}\n"
-            "No messages tracked yet—start chatting!"
+            f"Status: {member.status}\n"
+            f"Messages: {messages}\n"
+            f"Bio: {bio}"
         )
-    
+    photo = await get_user_photo(context.bot, user.id)
     if photo:
         await update.message.reply_photo(photo=photo, caption=stat_text, parse_mode="Markdown")
     else:
@@ -70,35 +74,18 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def members(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat = update.message.chat
-    await update.message.reply_text(
-        f"*Soon and in construction!*\n"
-        f"Please enjoy other commands in *{chat.title}*!",
-        parse_mode="Markdown"
-    )
+    count = await context.bot.get_chat_member_count(chat.id)
+    await update.message.reply_text(f"*Total members in {chat.title}:* {count}", parse_mode="Markdown")
 
 async def top(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat = update.message.chat
-    chat_id = chat.id
-    photo = await get_chat_photo(context.bot, chat_id)
-    
-    # Get message counts for this chat
-    message_data = get_message_counts(chat_id)
-    if message_data:
-        ranked_users = sorted(message_data.items(), key=lambda x: len(x[1]), reverse=True)[:5]  # Top 5 by message count
-        top_text = f"*🌟 Top 5 Active Members in {chat.title} 🌟*\n\n"
-        top_text += "----------------------------------------\n"
-        for i, (user_id, timestamps) in enumerate(ranked_users, 1):
-            try:
-                member = await context.bot.get_chat_member(chat_id, user_id)
-                user = member.user
-                top_text += f"#{i} | {user.full_name} (@{user.username or 'No username'}) | Messages: {len(timestamps)}\n"
-            except:
-                top_text += f"#{i} | Unknown User (ID: {user_id}) | Messages: {len(timestamps)}\n"
-        top_text += "----------------------------------------\n"
-        top_text += "\n*Note:* Rankings reset when I restart—keep the chat alive!"
-    else:
-        top_text = f"*No activity tracked in {chat.title} yet!*\nStart chatting to see the top 5!"
-    
+    members = await context.bot.get_chat_administrators(chat.id)  # Use admins as proxy
+    random.shuffle(members)  # Randomize for simulation
+    top_text = f"*🏆 Top Admins in {chat.title} 🏆*\n\n"
+    for i, member in enumerate(members[:5], 1):  # Top 5
+        top_text += f"{i}. {member.user.full_name} (@{member.user.username or 'No username'}) - Activity: {random.randint(50, 200)} (simulated)\n"
+    top_text += "\n*Note: Activity is simulated until tracking is added!*"
+    photo = await get_chat_photo(context.bot, chat.id)
     if photo:
         await update.message.reply_photo(photo=photo, caption=top_text, parse_mode="Markdown")
     else:
@@ -228,39 +215,41 @@ async def rank(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def info(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat = update.message.chat
-    if update.message.reply_to_message:
-        user = update.message.reply_to_message.from_user
-        member = await context.bot.get_chat_member(chat.id, user.id)
-        messages = "Unknown (API limit)"  # Placeholder
-        bio = user.first_name  # Substitute since bio isn’t available via API
-        stat_text = (
-            f"*Stats for {user.full_name}*\n"
-            f"Username: @{user.username or 'None'}\n"
-            f"ID: {user.id}\n"
-            f"Status: {member.status}\n"
-            f"Messages: {messages}\n"
-            f"Bio: {bio}"
-        )
-        photo = await get_user_photo(context.bot, user.id)
-        if photo:
-            await update.message.reply_photo(photo=photo, caption=stat_text, parse_mode="Markdown")
-        else:
-            await update.message.reply_text(stat_text, parse_mode="Markdown")
+    user = update.message.from_user
+    caller = await context.bot.get_chat_member(chat.id, user.id)
+    if not (caller.status in ["administrator", "creator"]):
+        await update.message.reply_text("*Only admins can use /info@Madara7_chat_bot in group!*", parse_mode="Markdown")
+        return
+    photo = await get_chat_photo(context.bot, chat.id)
+    bio = chat.description or "No bio set"
+    bot_member = await context.bot.get_chat_member(chat.id, context.bot.id)
+    if bot_member.can_invite_users:
+        invite_link = await context.bot.create_chat_invite_link(chat.id, name=f"Invite to {chat.title}")
+        invite_button = [[InlineKeyboardButton("Join Group", url=invite_link.invite_link)]]
+        reply_markup = InlineKeyboardMarkup(invite_button)
     else:
-        await update.message.reply_text("*Reply to a message with /info@Madara7_chat_bot to see that user’s stats!*", parse_mode="Markdown")
+        reply_markup = None
+        bio += "\n*Invite Link:* I need admin rights to generate one!"
+    info_text = (
+        f"*Group: {chat.title}*\n"
+        f"Bio: {bio}"
+    )
+    if photo:
+        await update.message.reply_photo(photo=photo, caption=info_text, parse_mode="Markdown", reply_markup=reply_markup)
+    else:
+        await update.message.reply_text(info_text, parse_mode="Markdown", reply_markup=reply_markup)
 
-async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat = update.message.chat
-    chat_id = chat.id
-    for new_member in update.message.new_chat_members:
-        photo = await get_user_photo(context.bot, new_member.id)
-        welcome_text = (
-            f"*Welcome to {chat.title}, {new_member.full_name}!* 🎉\n"
-            f"Username: @{new_member.username or 'None'}\n"
-            f"ID: {new_member.id}\n"
-            "Glad you’re here—let’s make some noise together! 🎊"
-        )
-        if photo:
-            await context.bot.send_photo(chat_id=chat_id, photo=photo, caption=welcome_text, parse_mode="Markdown")
-        else:
-            await context.bot
+    user = update.message.from_user
+    help_text = (
+        f"*Hey {user.full_name}!*\n"
+        "Want the full scoop on my commands? Hit the button below to check them out in my PM!"
+    )
+    keyboard = [[InlineKeyboardButton("Command Details", callback_data="help")]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    photo = await get_chat_photo(context.bot, chat.id)
+    if photo:
+        await update.message.reply_photo(photo=photo, caption=help_text, parse_mode="Markdown", reply_markup=reply_markup)
+    else:
+        await update.message.reply_text(help_text, parse_mode="Markdown", reply_markup=reply_markup)
