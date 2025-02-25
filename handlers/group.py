@@ -320,6 +320,7 @@ async def active(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     member_count = await context.bot.get_chat_member_count(chat.id)
     active_text = (
         f"*🌟 Activity Status of {chat.title} 🌟*\n"
+        f"Hey @{user.username or user.first_name}, thanks for using me iam sorry this feature is not active noe we work on it!!! so enjoy other feauter *{chat.title}*!\n"
         f"Total Members: {member_count}\n"
         f"Active Vibes: {random.randint(int(member_count * 0.5), member_count)} members buzzing around! (simulated)\n"
         "*Note:* Exact active counts aren’t available—enjoy the vibe check instead!"
@@ -358,11 +359,11 @@ async def info(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     # Check if the command is used in a group
     if chat.type not in ['group', 'supergroup']:
         print(f"Chat type {chat.type} is not a group or supergroup")
-        message.reply_text("This command can only be used in groups!")
+        await message.reply_text("This command can only be used in groups!")
         return
     print("Passed chat type check")
 
-    # Determine the target user (replied-to user or the sender)
+    # Determine the target user (replied-to user or sender)
     if message.reply_to_message:
         target_user = message.reply_to_message.from_user
         print(f"Target user (reply): {target_user.id}")
@@ -376,23 +377,38 @@ async def info(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     last_name = target_user.last_name or "N/A"
     username = f"@{target_user.username}" if target_user.username else "N/A"
     mention = f"[{first_name}](tg://user?id={user_id})"
-    dc_id = target_user.dc_id or "N/A"  # Data center ID, might not always be available
-    bio = "N/A"  # Telegram API doesn't provide bio directly via python-telegram-bot
-    print("User details gathered")
+    dc_id = target_user.dc_id or "N/A"
+    bio = "N/A"  # Bio not directly available; could use custom tracking
 
-    # Get profile photo count (requires Bot API interaction)
+    # Get group-specific info (status, joined date if bot is admin)
     try:
-        photo_count = context.bot.get_user_profile_photos(user_id).total_count
+        member = await context.bot.get_chat_member(chat.id, user_id)
+        status = member.status  # e.g., "member", "administrator", "creator"
+        print(f"User status in group: {status}")
+        joined_date = member.joined_date.strftime('%Y-%m-%d %H:%M:%S') if member.joined_date else "N/A"
+    except Exception as e:
+        status = "N/A"
+        joined_date = "N/A"
+        print(f"Error getting chat member info: {e}")
+
+    # Get profile photo count
+    try:
+        photo_count = (await context.bot.get_user_profile_photos(user_id, limit=1)).total_count
         print(f"Photo count: {photo_count}")
     except Exception as e:
         photo_count = "N/A"
         print(f"Error getting photo count: {e}")
 
-    # Get common chats (approximation, limited by privacy/API)
-    common_groups = "N/A"  # This requires custom tracking or premium API access
-    print("Common groups set to N/A")
+    # Get last seen (approximation, privacy-limited)
+    try:
+        user_status = target_user.status  # e.g., "online", "offline", "recently"
+        last_seen = user_status if user_status else "N/A"
+        print(f"Last seen: {last_seen}")
+    except Exception as e:
+        last_seen = "N/A"
+        print(f"Error getting last seen: {e}")
 
-    # Construct the info message
+    # Construct enhanced info message
     info_text = (
         "【 User Information 】\n"
         f"➢ ID: `{user_id}`\n"
@@ -401,14 +417,15 @@ async def info(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         f"➢ Username: {username}\n"
         f"➢ Mention: {mention}\n"
         f"➢ DC ID: {dc_id}\n"
-        f"➢ Bio: {bio}\n\n"
-        "➢ Custom Bio: N/A\n"
-        "➢ Custom Tag: N/A\n"
+        f"➢ Bio: {bio}\n"
+        f"➢ Group Status: {status.capitalize()}\n"
+        f"➢ Joined Group: {joined_date}\n"
         f"➢ Profile Photos: {photo_count} Photos\n"
+        f"➢ Last Seen: {last_seen.capitalize()}\n"
         "➢ Health: 100%\n"
-        "    ▰▰▰▰▰▰▰▰▰▰\n\n"
+        "    ▰▰▰▰▰▰▰▰▰▰\n"
         "➢ AFK Status: No\n"
-        f"➢ Common Groups: {common_groups}\n"
+        "➢ Common Groups: N/A\n"  # Could track with a database
         "➢ Globally Banned: No\n"
         "➢ Globally Muted: No"
     )
@@ -416,10 +433,13 @@ async def info(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     # Send the info as a reply
     try:
-        message.reply_text(info_text, parse_mode='Markdown')
+        await message.reply_text(info_text, parse_mode='MarkdownV2', disable_web_page_preview=True)
         print("Info message sent successfully")
     except Exception as e:
         print(f"Error sending info message: {e}")
+        # Fallback to plain text if Markdown fails
+        await message.reply_text(info_text)
+        print("Sent as plain text due to Markdown error")
 
 async def help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat = update.effective_chat

@@ -5,10 +5,9 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, ContextTypes, ChatMemberHandler, CallbackQueryHandler, CommandHandler, filters
 from handlers.pm import start_pm, help_command as pm_help_command, info as pm_info
 from utils.helpers import get_user_photo, get_chat_photo
-from handlers.group import (start_group, stats, stat, members, top, mute, unmute, photo, active, rank, info as group_info, help as group_help_command)  # Changed help_command to help
+from handlers.group import (start_group, stats, stat, members, top, mute, unmute, photo, active, rank, info as group_info, help as group_help_command)  # Fixed import
 
-# Replace with your new, valid token from BotFather
-TOKEN = "7702619386:AAG9rTm-56_aEkCV8Baqi9g42JWXt06C94E"  # e.g., "1234567890:ABCDEF1234567890abcdef1234567890"
+TOKEN = "7702619386:AAG9rTm-56_aEkCV8Baqi9g42JWXt06C94E"  # Replace with your new token from BotFather
 
 async def chat_member_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.my_chat_member and update.my_chat_member.new_chat_member.status == "member":
@@ -63,7 +62,6 @@ async def dummy_server():
         await asyncio.sleep(3600)
 
 def main():
-    # Build the application
     application = Application.builder().token(TOKEN).build()
 
     # PM commands
@@ -89,11 +87,10 @@ def main():
     application.add_handler(ChatMemberHandler(chat_member_handler, ChatMemberHandler.MY_CHAT_MEMBER))
     application.add_handler(CallbackQueryHandler(button_handler))
 
-    # Schedule dummy_server as a background task after bot initialization
     loop = asyncio.get_event_loop()
     loop.create_task(dummy_server())
 
-    # Start polling
+    print("Bot starting polling...")
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
