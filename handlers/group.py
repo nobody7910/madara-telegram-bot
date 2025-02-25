@@ -1,16 +1,51 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ChatPermissions
-from telegram.ext import ContextTypes
+from telegram.ext import ContextTypes, Application, CommandHandler, MessageHandler, Filters, CallbackQueryHandler
 from utils.helpers import get_user_photo, get_chat_photo
 from datetime import datetime
 import random
+import time
+from collections import defaultdict
+
+# In-memory storage for message counts (replace with a database for persistence)
+message_counts = defaultdict(int)
+daily_counts = defaultdict(lambda: defaultdict(int))  # For today/tomorrow filtering
+
+# Track all messages in the group to count them
+async def track_messages(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    chat = update.effective_chat
+    if chat.type in ['group', 'supergroup']:
+        user = update.effective_user
+        if user and not user.is_bot:  # Ignore bots
+            user_id = user.id
+            current_time = time.time()
+            current_day = time.strftime("%Y-%m-%d", time.localtime(current_time))
+            current_month = time.strftime("%Y-%m", time.localtime(current_time))
+            
+            # Update total message count
+            message_counts[user_id] += 1
+            # Update daily count
+            daily_counts[user_id][current_day] += 1
 
 async def start_group(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     bot = context.bot
-    chat = update.message.chat
-    bot_photo = await get_user_photo(bot, bot.id)  # Bot's profile pic
+    chat = update.effective_chat
+    user = update.effective_user
+    args = context.args  # Check for start parameters
+
+    # Check if started in PM with ?start=help
+    if chat.type == 'private' and args and args[0] == "help":
+        await send_help_summary(update, context, user)
+        return
+
+    # Original group start behavior
+    bot_photo = await get_user_photo(bot, bot.id)
     intro_text = (
         f"🎉 *Greetings, {chat.title}!* 🎉\n"
-        "I’m @Madara7_chat_bot, your group’s new MVP.\n"
+        f"*Hey {user.first_name}!* 👋\n"
+        f"[{user.username or user.full_name}]\n"
+        "I’m @Madara7_chat_bot—your group stats manager bot by chilling friends! Add me to a group to unlock my powers.\n"
+        "In PM, only /start, /help, and /info work.\n"
+        "I’m your group’s new MVP.\n"
         "Stats, ranks, and fun—ready to roll!"
     )
     keyboard = [
@@ -24,53 +59,127 @@ async def start_group(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         await update.message.reply_text(intro_text, parse_mode="Markdown", reply_markup=reply_markup)
 
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    chat = update.message.chat
+    chat = update.effective_chat
     member_count = await context.bot.get_chat_member_count(chat.id)
-    creation_date = datetime.fromtimestamp(chat.id / (1 << 32)).strftime('%Y-%m-%d')
+    creation_date = datetime.fromtimestamp(chat.id / (1 << 32)).strftime('%Y-%m-%d')  # Fixed: Renamed 'counts' to 'creation_date'
     photo = await get_chat_photo(context.bot, chat.id)
     stats_text = (
         f"*Group: {chat.title}*\n"
         f"Members: {member_count}\n"
-        f"Created: {creation_date} (approx)"
+        f"Created: {creation_date} (approx)"  # Fixed: Used creation_date
     )
     if photo:
         await update.message.reply_photo(photo=photo, caption=stats_text, parse_mode="Markdown")
     else:
         await update.message.reply_text(stats_text, parse_mode="Markdown")
 
+# New stat command with leaderboard
 async def stat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    chat = update.message.chat
-    if update.message.reply_to_message:
-        user = update.message.reply_to_message.from_user
-        member = await context.bot.get_chat_member(chat.id, user.id)
-        messages = "Unknown (API limit)"  # Placeholder
-        bio = user.first_name  # Substitute since bio isn’t available via API
-        stat_text = (
-            f"*Stats for {user.full_name}*\n"
-            f"Username: @{user.username or 'None'}\n"
-            f"ID: {user.id}\n"
-            f"Status: {member.status}\n"
-            f"Messages: {messages}\n"
-            f"Bio: {bio}"
-        )
+    chat = update.effective_chat
+    message = update.effective_message
+
+    # Check if the command is used in a group
+    if chat.type not in ['group', 'supergroup']:
+        await message.reply_text("This command can only be used in groups!")
+        return
+
+    # Get current time for filtering
+    current_time = time.time()
+    current_day = time.strftime("%Y-%m-%d", time.localtime(current_time))
+    tomorrow_day = time.strftime("%Y-%m-%d", time.localtime(current_time + 86400))
+    current_month = time.strftime("%Y-%m", time.localtime(current_time))
+
+    # Default to total message counts
+    leaderboard_data = message_counts
+
+    # Sort users by message count and get top 10
+    sorted_users = sorted(leaderboard_data.items(), key=lambda x: x[1], reverse=True)[:10]
+    total_messages = sum(message_counts.values())
+
+    # Build leaderboard text
+    leaderboard_text = "📈 LEADERBOARD\n"
+    for i, (user_id, count) in enumerate(sorted_users, 1):
+        try:
+            user = await context.bot.get_chat(user_id)
+            username = user.username if user.username else user.first_name
+            profile_link = f"https://t.me/{username}" if user.username else f"tg://user?id={user_id}"
+            name = user.first_name or "Unknown"
+            leaderboard_text += (
+                f"{i}. 👤 {name} ({profile_link}) • {count:,} ex.\n"
+            )
+        except:
+            leaderboard_text += f"{i}. 👤 [User Left] • {count:,} ex.\n"
+
+    leaderboard_text += f"\n✉️ Total messages: {total_messages:,}"
+
+    # Inline buttons for filtering
+    keyboard = [
+        [
+            InlineKeyboardButton("Today", callback_data="stat_today"),
+            InlineKeyboardButton("Tomorrow", callback_data="stat_tomorrow"),
+            InlineKeyboardButton("This Month", callback_data="stat_month"),
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    # Send the leaderboard
+    await message.reply_text(leaderboard_text, reply_markup=reply_markup, parse_mode='Markdown')
+
+# Handle button presses
+async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    await query.answer()
+
+    chat = query.message.chat
+    if chat.type not in ['group', 'supergroup']:
+        return
+
+    current_time = time.time()
+    current_day = time.strftime("%Y-%m-%d", time.localtime(current_time))
+    tomorrow_day = time.strftime("%Y-%m-%d", time.localtime(current_time + 86400))
+    current_month = time.strftime("%Y-%m", time.localtime(current_time))
+
+    # Determine which filter to apply
+    if query.data == "stat_today":
+        leaderboard_data = {user_id: counts[current_day] for user_id, counts in daily_counts.items()}
+        filter_label = "Today"
+    elif query.data == "stat_tomorrow":
+        leaderboard_data = {user_id: counts.get(tomorrow_day, 0) for user_id, counts in daily_counts.items()}
+        filter_label = "Tomorrow"
+    elif query.data == "stat_month":
+        leaderboard_data = message_counts  # Simplified; extend with monthly tracking if needed
+        filter_label = "This Month"
     else:
-        user = update.message.from_user
-        member = await context.bot.get_chat_member(chat.id, user.id)
-        messages = "Unknown (API limit)"  # Placeholder
-        bio = user.first_name  # Substitute
-        stat_text = (
-            f"*Your Stats, {user.full_name}!*\n"
-            f"Username: @{user.username or 'None'}\n"
-            f"ID: {user.id}\n"
-            f"Status: {member.status}\n"
-            f"Messages: {messages}\n"
-            f"Bio: {bio}"
-        )
-    photo = await get_user_photo(context.bot, user.id)
-    if photo:
-        await update.message.reply_photo(photo=photo, caption=stat_text, parse_mode="Markdown")
-    else:
-        await update.message.reply_text(stat_text, parse_mode="Markdown")
+        return
+
+    # Sort and get top 10
+    sorted_users = sorted(leaderboard_data.items(), key=lambda x: x[1], reverse=True)[:10]
+    total_messages = sum(leaderboard_data.values())
+
+    # Build updated leaderboard text
+    leaderboard_text = f"📈 LEADERBOARD ({filter_label})\n"
+    for i, (user_id, count) in enumerate(sorted_users, 1):
+        try:
+            user = await context.bot.get_chat(user_id)
+            username = user.username if user.username else user.first_name
+            profile_link = f"https://t.me/{username}" if user.username else f"tg://user?id={user_id}"
+            name = user.first_name or "Unknown"
+            leaderboard_text += (
+                f"{i}. 👤 {name} ({profile_link}) • {count:,} ex.\n"
+            )
+        except:
+            leaderboard_text += f"{i}. 👤 [User Left] • {count:,} ex.\n"
+
+    leaderboard_text += f"\n✉️ Total messages: {total_messages:,}"
+
+    # Reuse the same buttons
+    keyboard = [
+        [
+            InlineKeyboardButton("Today", callback_data="stat_today"),
+            InlineKeyboardButton("Tomorrow", callback_data="stat_tomorrow"),
+            InlineKeyboardButton("This Month", callback_data="stat_month"),
+        ]
+    ]
 
 async def members(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat = update.message.chat
@@ -213,43 +322,79 @@ async def rank(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     else:
         await update.message.reply_text("*Not enough members to rank!*", parse_mode="Markdown")
 
-async def info(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    chat = update.message.chat
-    user = update.message.from_user
-    caller = await context.bot.get_chat_member(chat.id, user.id)
-    if not (caller.status in ["administrator", "creator"]):
-        await update.message.reply_text("*Only admins can use /info@Madara7_chat_bot in group!*", parse_mode="Markdown")
-        return
-    photo = await get_chat_photo(context.bot, chat.id)
-    bio = chat.description or "No bio set"
-    bot_member = await context.bot.get_chat_member(chat.id, context.bot.id)
-    if bot_member.can_invite_users:
-        invite_link = await context.bot.create_chat_invite_link(chat.id, name=f"Invite to {chat.title}")
-        invite_button = [[InlineKeyboardButton("Join Group", url=invite_link.invite_link)]]
-        reply_markup = InlineKeyboardMarkup(invite_button)
-    else:
-        reply_markup = None
-        bio += "\n*Invite Link:* I need admin rights to generate one!"
-    info_text = (
-        f"*Group: {chat.title}*\n"
-        f"Bio: {bio}"
-    )
-    if photo:
-        await update.message.reply_photo(photo=photo, caption=info_text, parse_mode="Markdown", reply_markup=reply_markup)
-    else:
-        await update.message.reply_text(info_text, parse_mode="Markdown", reply_markup=reply_markup)
+async def def info(update, context):
+    chat = update.effective_chat
+    message = update.effective_message
 
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    chat = update.message.chat
-    user = update.message.from_user
-    help_text = (
-        f"*Hey {user.full_name}!*\n"
-        "Want the full scoop on my commands? Hit the button below to check them out in my PM!"
-    )
-    keyboard = [[InlineKeyboardButton("Command Details", callback_data="help")]]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    photo = await get_chat_photo(context.bot, chat.id)
-    if photo:
-        await update.message.reply_photo(photo=photo, caption=help_text, parse_mode="Markdown", reply_markup=reply_markup)
+    # Check if the command is used in a group
+    if chat.type not in ['group', 'supergroup']:
+        message.reply_text("This command can only be used in groups!")
+        return
+
+    # Determine the target user (replied-to user or the sender)
+    if message.reply_to_message:
+        target_user = message.reply_to_message.from_user
     else:
-        await update.message.reply_text(help_text, parse_mode="Markdown", reply_markup=reply_markup)
+        target_user = update.effective_user
+
+    # Get user details
+    user_id = target_user.id
+    first_name = target_user.first_name or "N/A"
+    last_name = target_user.last_name or "N/A"
+    username = f"@{target_user.username}" if target_user.username else "N/A"
+    mention = f"[{first_name}](tg://user?id={user_id})"
+    dc_id = target_user.dc_id or "N/A"  # Data center ID, might not always be available
+    bio = "N/A"  # Telegram API doesn't provide bio directly via python-telegram-bot
+
+    # Get profile photo count (requires Bot API interaction)
+    try:
+        photo_count = context.bot.get_user_profile_photos(user_id).total_count
+    except:
+        photo_count = "N/A"
+
+    # Get common chats (approximation, limited by privacy/API)
+    common_groups = "N/A"  # This requires custom tracking or premium API access
+
+    # Construct the info message
+    info_text = (
+        "【 User Information 】\n"
+        f"➢ ID: `{user_id}`\n"
+        f"➢ First Name: {first_name}\n"
+        f"➢ Last Name: {last_name}\n"
+        f"➢ Username: {username}\n"
+        f"➢ Mention: {mention}\n"
+        f"➢ DC ID: {dc_id}\n"
+        f"➢ Bio: {bio}\n\n"
+        "➢ Custom Bio: N/A\n"
+        "➢ Custom Tag: N/A\n"
+        f"➢ Profile Photos: {photo_count} Photos\n"
+        "➢ Health: 100%\n"
+        "    ▰▰▰▰▰▰▰▰▰▰\n\n"
+        "➢ AFK Status: No\n"
+        f"➢ Common Groups: {common_groups}\n"
+        "➢ Globally Banned: No\n"
+        "➢ Globally Muted: No"
+    )
+
+    # Send the info as a reply
+    message.reply_text(info_text, parse_mode='Markdown')
+
+async def help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    chat = update.effective_chat
+    message = update.effective_message
+
+    # Check if the command is used in a group
+    if chat.type in ['group', 'supergroup']:
+        intro_text = (
+            "📚 *Need help with @Madara7_chat_bot?*\n"
+            "I’m here to manage your group stats and more! Click below to see my full command list in DM."
+        )
+        keyboard = [
+            [InlineKeyboardButton("Help", url=f"https://t.me/Madara7_chat_bot?start=help")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await message.reply_text(intro_text, parse_mode='Markdown', reply_markup=reply_markup)
+    else:
+        # If used in PM, handle it directly (we’ll refine this in pm.py or below)
+        user = update.effective_user
+        await send_help_summary(update, context, user)

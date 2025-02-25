@@ -83,6 +83,7 @@ def main() -> None:
     application.add_handler(CommandHandler("rank", rank, filters=filters.ChatType.GROUPS))
     application.add_handler(CommandHandler("info", group_info, filters=filters.ChatType.GROUPS))
     application.add_handler(CommandHandler("help", group_help_command, filters=filters.ChatType.GROUPS))
+    application.add_handler(CommandHandler("help", help))
 
     application.add_handler(ChatMemberHandler(chat_member_handler, ChatMemberHandler.MY_CHAT_MEMBER))
     application.add_handler(CallbackQueryHandler(button_handler))
