@@ -1,10 +1,33 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ChatPermissions
-from telegram.ext import ContextTypes, Application, CommandHandler, MessageHandler, Filters, CallbackQueryHandler
+from telegram.ext import ContextTypes, Application, CommandHandler, MessageHandler, filters, CallbackQueryHandler  # Changed Filters to filters
 from utils.helpers import get_user_photo, get_chat_photo
 from datetime import datetime
 import random
 import time
 from collections import defaultdict
+
+# Rest of your code remains unchanged
+# In-memory storage for message counts (replace with a database for persistence)
+message_counts = defaultdict(int)
+daily_counts = defaultdict(lambda: defaultdict(int))  # For today/tomorrow filtering
+
+# Track all messages in the group to count them
+async def track_messages(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    chat = update.effective_chat
+    if chat.type in ['group', 'supergroup']:
+        user = update.effective_user
+        if user and not user.is_bot:  # Ignore bots
+            user_id = user.id
+            current_time = time.time()
+            current_day = time.strftime("%Y-%m-%d", time.localtime(current_time))
+            current_month = time.strftime("%Y-%m", time.localtime(current_time))
+            
+            # Update total message count
+            message_counts[user_id] += 1
+            # Update daily count
+            daily_counts[user_id][current_day] += 1
+
+# ... (rest of your functions like start_group, stats, stat, etc., remain as-is)
 
 # In-memory storage for message counts (replace with a database for persistence)
 message_counts = defaultdict(int)
