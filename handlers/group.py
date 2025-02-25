@@ -87,6 +87,7 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     creation_date = datetime.fromtimestamp(chat.id / (1 << 32)).strftime('%Y-%m-%d')  # Fixed: Renamed 'counts' to 'creation_date'
     photo = await get_chat_photo(context.bot, chat.id)
     stats_text = (
+        f"[{user.username or user.full_name}]\n"
         f"*Group: {chat.title}*\n"
         f"Members: {member_count}\n"
         f"Created: {creation_date} (approx)"  # Fixed: Used creation_date
@@ -350,19 +351,24 @@ async def rank(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await update.message.reply_text("*Not enough members to rank!*", parse_mode="Markdown")
 
 async def info(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    print("Group /info command triggered")
     chat = update.effective_chat
     message = update.effective_message
 
     # Check if the command is used in a group
     if chat.type not in ['group', 'supergroup']:
+        print(f"Chat type {chat.type} is not a group or supergroup")
         message.reply_text("This command can only be used in groups!")
         return
+    print("Passed chat type check")
 
     # Determine the target user (replied-to user or the sender)
     if message.reply_to_message:
         target_user = message.reply_to_message.from_user
+        print(f"Target user (reply): {target_user.id}")
     else:
         target_user = update.effective_user
+        print(f"Target user (self): {target_user.id}")
 
     # Get user details
     user_id = target_user.id
@@ -372,15 +378,19 @@ async def info(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     mention = f"[{first_name}](tg://user?id={user_id})"
     dc_id = target_user.dc_id or "N/A"  # Data center ID, might not always be available
     bio = "N/A"  # Telegram API doesn't provide bio directly via python-telegram-bot
+    print("User details gathered")
 
     # Get profile photo count (requires Bot API interaction)
     try:
         photo_count = context.bot.get_user_profile_photos(user_id).total_count
-    except:
+        print(f"Photo count: {photo_count}")
+    except Exception as e:
         photo_count = "N/A"
+        print(f"Error getting photo count: {e}")
 
     # Get common chats (approximation, limited by privacy/API)
     common_groups = "N/A"  # This requires custom tracking or premium API access
+    print("Common groups set to N/A")
 
     # Construct the info message
     info_text = (
@@ -402,26 +412,11 @@ async def info(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "➢ Globally Banned: No\n"
         "➢ Globally Muted: No"
     )
+    print("Info text constructed")
 
     # Send the info as a reply
-    message.reply_text(info_text, parse_mode='Markdown')
-
-async def help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    chat = update.effective_chat
-    message = update.effective_message
-
-    # Check if the command is used in a group
-    if chat.type in ['group', 'supergroup']:
-        intro_text = (
-            "📚 *Need help with @Madara7_chat_bot?*\n"
-            "I’m here to manage your group stats and more! Click below to see my full command list in DM."
-        )
-        keyboard = [
-            [InlineKeyboardButton("Help", url=f"https://t.me/Madara7_chat_bot?start=help")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await message.reply_text(intro_text, parse_mode='Markdown', reply_markup=reply_markup)
-    else:
-        # If used in PM, handle it directly (we’ll refine this in pm.py or below)
-        user = update.effective_user
-        await send_help_summary(update, context, user)
+    try:
+        message.reply_text(info_text, parse_mode='Markdown')
+        print("Info message sent successfully")
+    except Exception as e:
+        print(f"Error sending info message: {e}")
