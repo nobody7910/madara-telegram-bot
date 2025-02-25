@@ -2,9 +2,9 @@ import asyncio
 import os
 import socket
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, ContextTypes, ChatMemberHandler, CallbackQueryHandler, CommandHandler, filters  # Changed Filters to filters
+from telegram.ext import Application, ContextTypes, ChatMemberHandler, CallbackQueryHandler, CommandHandler, filters
 from handlers.pm import start_pm, help_command as pm_help_command, info as pm_info
-from handlers.group import (start_group, stats, stat, members, top, mute, unmute, photo, active, rank, info as group_info, help as group_help_command)  # Adjusted import
+from handlers.group import (start_group, stats, stat, members, top, mute, unmute, photo, active, rank, info as group_info, help as group_help_command)
 from utils.helpers import get_user_photo, get_chat_photo
 
 TOKEN = os.environ.get("TOKEN", "7702619386:AAEARRjDuv-ioDB3vRkV2s72oUXZkNVha08")
@@ -61,7 +61,8 @@ async def dummy_server():
     while True:
         await asyncio.sleep(3600)
 
-async def main():
+def main():
+    # Build the application
     application = Application.builder().token(TOKEN).build()
 
     # PM commands
@@ -87,8 +88,12 @@ async def main():
     application.add_handler(ChatMemberHandler(chat_member_handler, ChatMemberHandler.MY_CHAT_MEMBER))
     application.add_handler(CallbackQueryHandler(button_handler))
 
+    # Schedule dummy_server as a background task after bot initialization
+    loop = asyncio.get_event_loop()
+    loop.create_task(dummy_server())
+
     # Start polling
-    await application.run_polling(allowed_updates=Update.ALL_TYPES)
+    application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
