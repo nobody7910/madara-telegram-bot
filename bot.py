@@ -7,7 +7,8 @@ from handlers.pm import start_pm, help_command as pm_help_command, info as pm_in
 from handlers.group import (start_group, stats, stat, members, top, mute, unmute, photo, active, rank, info as group_info, help as group_help_command)
 from utils.helpers import get_user_photo, get_chat_photo
 
-TOKEN = os.environ.get("TOKEN", "7702619386:AAG9rTm-56_aEkCV8Baqi9g42JWXt06C94E")
+# Replace with your new token from BotFather
+TOKEN = "7702619386:AAG9rTm-56_aEkCV8Baqi9g42JWXt06C94E"  # e.g., "1234567890:ABCDEF1234567890abcdef1234567890"
 
 async def chat_member_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.my_chat_member and update.my_chat_member.new_chat_member.status == "member":
