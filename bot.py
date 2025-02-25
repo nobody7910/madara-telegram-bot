@@ -4,6 +4,7 @@ import socket
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, ContextTypes, ChatMemberHandler, CallbackQueryHandler, CommandHandler, filters, ApplicationHandlerStop
+import telegram  # For error handling
 from handlers.pm import start_pm, help_command as pm_help_command, info as pm_info
 from utils.helpers import get_user_photo, get_chat_photo
 from handlers.group import (start_group, stats, stat, members, top, mute, unmute, photo, active, rank, info as group_info, help as group_help_command)
@@ -12,8 +13,8 @@ from handlers.group import (start_group, stats, stat, members, top, mute, unmute
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Replace with your new, valid token from BotFather
-TOKEN = "7702619386:AAG9rTm-56_aEkCV8Baqi9g42JWXt06C94E"  # e.g., "1234567890:ABCDEF1234567890abcdef1234567890"
+# Use a new, valid token from BotFather
+TOKEN = "7702619386:AAG9rTm-56_aEkCV8Baqi9g42JWXt06C94E"  # Replace with your new token
 
 async def chat_member_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.my_chat_member and update.my_chat_member.new_chat_member.status == "member":
@@ -49,7 +50,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             "/photo@Madara7_chat_bot - Show profile pics (reply or self, up to 5)\n"
             "/active@Madara7_chat_bot - Show group activity status\n"
             "/rank@Madara7_chat_bot - Randomly rank a member\n"
-            "/info@Madara7_chat_bot - Group bio and invite link (admin-only)\n"
+            "/info@Madara7_chat_bot - Detailed user info in group\n"
             "/help@Madara7_chat_bot - Redirects you here\n\n"
             "*Note:* Some features are simulated due to Telegram limits."
         )
@@ -72,7 +73,7 @@ async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     logger.error("Exception occurred:", exc_info=context.error)
     if isinstance(context.error, telegram.error.Conflict):
         logger.warning("Conflict detected: Another instance is running. Stopping this instance.")
-        raise ApplicationHandlerStop  # Stop this instance gracefully
+        raise ApplicationHandlerStop
 
 def main():
     application = Application.builder().token(TOKEN).build()
