@@ -1,34 +1,22 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from utils.helpers import get_user_photo, bot_uptime
-from telegram import Update
-from telegram.ext import ContextTypes
 
 async def start_pm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
     args = context.args
-    photo = await get_user_photo(context.bot, user.id)  # Fetch photo first
-    intro_text = f"Hi {user.first_name}! I'm @Madara7_chat_bot. Use /help for commands."
-
     if args and args[0] == "help":
         await send_help_summary(update, context, user)
     else:
-        keyboard = [[InlineKeyboardButton("Add me to a group", url="https://t.me/Madara7_chat_bot?startgroup=true")]]
+        # Define intro_text and photo for the welcome message
+        intro_text = f"Hi {user.first_name}! I’m @Madara7_chat_bot. Use /help for commands."
+        photo = await get_user_photo(context.bot, context.bot.id)  # Bot's profile photo
+        keyboard = [[InlineKeyboardButton("Add me to a group", url=f"https://t.me/Madara7_chat_bot?startgroup=true")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
-
         if photo:
-            await update.message.reply_photo(
-                photo=photo,
-                caption=intro_text,
-                parse_mode="Markdown",
-                reply_markup=reply_markup
-            )
+            await update.message.reply_photo(photo=photo, caption=intro_text, parse_mode="Markdown", reply_markup=reply_markup)
         else:
-            await update.message.reply_text(
-                intro_text,
-                parse_mode="Markdown",
-                reply_markup=reply_markup
-            )
+            await update.message.reply_text(intro_text, parse_mode="Markdown", reply_markup=reply_markup)
 
 async def send_help_summary(update: Update, context: ContextTypes.DEFAULT_TYPE, user) -> None:
     summary_text = (
@@ -83,6 +71,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     else:
         await update.message.reply_text(help_text, parse_mode="Markdown")
 
+# Adding info command since it's imported in bot.py
 async def info(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    uptime_str = bot_uptime()
-    await update.message.reply_text(f"*Bot Uptime:* {uptime_str}", parse_mode="Markdown")
+    uptime = bot_uptime()
+    await update.message.reply_text(f"Bot Uptime: {uptime}")
