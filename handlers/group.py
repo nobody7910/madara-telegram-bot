@@ -420,3 +420,20 @@ async def info(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         print("Info message sent successfully")
     except Exception as e:
         print(f"Error sending info message: {e}")
+
+async def help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    chat = update.effective_chat
+    message = update.effective_message
+    if chat.type in ['group', 'supergroup']:
+        intro_text = (
+            "📚 *Need help with @Madara7_chat_bot?*\n"
+            "I’m here to manage your group stats and more! Click below to see my full command list in DM."
+        )
+        keyboard = [
+            [InlineKeyboardButton("Help", url=f"https://t.me/Madara7_chat_bot?start=help")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await message.reply_text(intro_text, parse_mode='Markdown', reply_markup=reply_markup)
+    else:
+        user = update.effective_user
+        await send_help_summary(update, context, user)
