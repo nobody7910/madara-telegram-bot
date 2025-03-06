@@ -172,6 +172,38 @@ async def rank_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     
     await update.message.reply_text(rank_text)
 
-# Placeholder for callback (if needed later)
+async def top_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    # Reusing rank_command logic for simplicity
+    chat = update.effective_chat
+    if chat.type not in ["group", "supergroup"]:
+        await update.message.reply_text("This command works only in groups!")
+        return
+    
+    chat_id = str(chat.id)
+    if chat_id not in message_counts or not message_counts[chat_id]:
+        await update.message.reply_text("No top dogs yet! Chat more to claim the throne! 👑")
+        return
+    
+    ranked = sorted(
+        message_counts[chat_id].items(),
+        key=lambda x: x[1]["monthly"],
+        reverse=True
+    )[:3]  # Top 3 for brevity
+    
+    top_text = f"👑 Top Dogs in {chat.title} 👑\n"
+    for i, (user_id, data) in enumerate(ranked, 1):
+        user = await context.bot.get_chat_member(chat_id, int(user_id))
+        top_text += f"{i}. {user.user.first_name} - {data['monthly']} messages\n"
+    
+    await update.message.reply_text(top_text)
+
+async def active_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    # Placeholder for active users (could track recent activity)
+    await update.message.reply_text("Active users feature coming soon! Stay tuned! 😉")
+
+async def leaderboard_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    # Alias for rank_command
+    await rank_command(update, context)
+
 async def handle_stat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    pass
+    pass  # Placeholder for future callbacks

@@ -39,10 +39,10 @@ def register_handlers(application):
     application.add_handler(CommandHandler("unmute", unmute_command))
     application.add_handler(CommandHandler("members", members_command))
     application.add_handler(CommandHandler("rank", rank_command))
+    application.add_handler(CommandHandler("top", top_command))  # Fixed import
     application.add_handler(CommandHandler("group_stats", get_group_stats))
     application.add_handler(CommandHandler("top_members", get_top_members))
     application.add_handler(CommandHandler("message_freq", get_message_frequency))
-    application.add_handler(CommandHandler("top", top_command))
     application.add_handler(CommandHandler("active", active_command))
     application.add_handler(CommandHandler("leaderboard", leaderboard_command))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, track_messages))
