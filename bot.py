@@ -17,12 +17,27 @@ from handlers.group import (
     track_messages, leaderboard_command, handle_stat_callback
 )
 from handlers.pm import start_command as pm_start, help_command as pm_help
+from aiohttp import web
+import asyncio
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
 )
 logger = logging.getLogger(__name__)
+
+# Health check endpoint for Koyeb
+async def health_check(request):
+    return web.Response(text="OK", status=200)
+
+async def start_health_server():
+    app = web.Application()
+    app.add_routes([web.get('/', health_check)])
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, '0.0.0.0', 8000)  # Match Koyeb’s expected port
+    await site.start()
+    logger.info("Health check server running on port 8000")
 
 def register_handlers(application):
     logger.info("Registering handlers...")
@@ -42,22 +57,26 @@ def register_handlers(application):
     application.add_handler(CallbackQueryHandler(handle_stat_callback, pattern=r'^stat_'))
     logger.info("Handlers registered successfully.")
 
-def main() -> None:
+async def main():
     logger.info("Starting bot...")
     if not BOT_TOKEN:
-        logger.error("BOT_TOKEN is not set. Please check environment variables.")
+        logger.error("BOT_TOKEN is not set.")
         raise ValueError("BOT_TOKEN is required but not provided.")
-    
-    try:
-        application = Application.builder().token(BOT_TOKEN).build()
-        logger.info("Application built successfully.")
-        register_handlers(application)
-        logger.info("Starting polling...")
-        application.run_polling(allowed_updates=Update.ALL_TYPES)
-    except Exception as e:
-        logger.error(f"Failed to start bot: {e}")
-        raise
+
+    application = Application.builder().token(BOT_TOKEN).build()
+    logger.info("Application built successfully.")
+    register_handlers(application)
+
+    # Get the current event loop
+    loop = asyncio.get_event_loop()
+
+    # Start the health check server as a task
+    loop.create_task(start_health_server())
+
+    # Run polling in the same loop
+    logger.info("Starting polling...")
+    await application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == '__main__':
     logger.info("Bot script initiated.")
-    main()
+    asyncio.run(main())
