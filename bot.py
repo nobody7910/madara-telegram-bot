@@ -17,12 +17,27 @@ from handlers.group import (
     track_messages, leaderboard_command, handle_stat_callback
 )
 from handlers.pm import start_command as pm_start, help_command as pm_help
+from aiohttp import web
+import asyncio
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
 )
 logger = logging.getLogger(__name__)
+
+# Dummy HTTP health check endpoint
+async def health_check(request):
+    return web.Response(text="OK", status=200)
+
+async def start_http_server():
+    app = web.Application()
+    app.add_routes([web.get('/health', health_check)])
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, '0.0.0.0', 8080)
+    await site.start()
+    logger.info("Health check server running on port 8080")
 
 def register_handlers(application):
     logger.info("Registering handlers...")
@@ -42,7 +57,7 @@ def register_handlers(application):
     application.add_handler(CallbackQueryHandler(handle_stat_callback, pattern=r'^stat_'))
     logger.info("Handlers registered successfully.")
 
-def main() -> None:
+async def main() -> None:
     logger.info("Starting bot...")
     if not BOT_TOKEN:
         logger.error("BOT_TOKEN is not set. Please check environment variables.")
@@ -52,12 +67,16 @@ def main() -> None:
         application = Application.builder().token(BOT_TOKEN).build()
         logger.info("Application built successfully.")
         register_handlers(application)
-        logger.info("Starting polling...")
-        application.run_polling(allowed_updates=Update.ALL_TYPES)
+        
+        # Start both the bot polling and HTTP server
+        await asyncio.gather(
+            start_http_server(),
+            application.run_polling(allowed_updates=Update.ALL_TYPES)
+        )
     except Exception as e:
         logger.error(f"Failed to start bot: {e}")
         raise
 
 if __name__ == '__main__':
     logger.info("Bot script initiated.")
-    main()
+    asyncio.run(main())
