@@ -1,260 +1,177 @@
 # handlers/group.py
 import logging
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ChatPermissions
+import time
+from datetime import datetime, timedelta
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
-from datetime import datetime
-import random
+from telegram.error import Forbidden
 
 logger = logging.getLogger(__name__)
 
-message_logs = {}  # {chat_id: {user_id: [{'timestamp': datetime, 'count': int}, ...]}}
+# In-memory message tracking (use a DB for production)
+message_counts = {}
 
-async def stat_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def track_messages(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat = update.effective_chat
-    target_user = update.message.reply_to_message.from_user if update.message.reply_to_message else update.effective_user
+    user = update.effective_user
+    if chat.type not in ["group", "supergroup"]:
+        return
     
-    try:
-        chat_member = await context.bot.get_chat_member(chat.id, target_user.id)
-        user_message_count = sum(log['count'] for log in message_logs.get(chat.id, {}).get(target_user.id, []))
-        
-        user_bio = "No bio available"
-        stats_message = (
-            f"👤 User Stats for {target_user.first_name}\n\n"
-            f"📌 Name: {target_user.first_name} {target_user.last_name or ''}\n"
-            f"🆔 User ID: {target_user.id}\n"
-            f"👥 Status: {chat_member.status}\n"
-            f"💬 Total Messages: {user_message_count}\n"
-            f"📝 Bio: {user_bio}"
-        )
-        
-        user_profile_photos = await context.bot.get_user_profile_photos(target_user.id, limit=1)
-        if user_profile_photos.total_count > 0:
-            await update.message.reply_photo(photo=user_profile_photos.photos[0][-1].file_id, caption=stats_message)
-        else:
-            await update.message.reply_text(stats_message)
-    except Exception as e:
-        logger.error(f"Error in stat command: {e}")
-        await update.message.reply_text("Could not retrieve user stats.")
+    chat_id = str(chat.id)
+    user_id = str(user.id)
+    today = datetime.now().date()
+    
+    if chat_id not in message_counts:
+        message_counts[chat_id] = {}
+    if user_id not in message_counts[chat_id]:
+        message_counts[chat_id][user_id] = {"daily": {}, "monthly": 0}
+    if today not in message_counts[chat_id][user_id]["daily"]:
+        message_counts[chat_id][user_id]["daily"][today] = 0
+    message_counts[chat_id][user_id]["daily"][today] += 1
+    message_counts[chat_id][user_id]["monthly"] += 1
 
 async def info_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat = update.effective_chat
-    target_user = update.message.reply_to_message.from_user if update.message.reply_to_message else update.effective_user
+    message = update.effective_message
+    user = message.from_user if not message.reply_to_message else message.reply_to_message.from_user
     
-    try:
-        chat_member = await context.bot.get_chat_member(chat.id, target_user.id) if chat.type in ['group', 'supergroup'] else None
-        user_photos = await context.bot.get_user_profile_photos(target_user.id)
-        photo_count = user_photos.total_count if user_photos else 0
-        
-        health_percentage = random.randint(80, 100)
-        health_bar_length = 10
-        filled_length = int(health_bar_length * health_percentage / 100)
-        health_bar = '▰' * filled_length + '▱' * (health_bar_length - filled_length)
-        
-        info_message = (
-            f"【 User Information 】\n\n"
-            f"➢ ID: `{target_user.id}`\n"
-            f"➢ First Name: {target_user.first_name}\n"
-            f"➢ Last Name: {target_user.last_name or 'N/A'}\n"
-            f"➢ Username: {f'@{target_user.username}' if target_user.username else 'N/A'}\n"
-            f"➢ Mention: [{target_user.first_name}](tg://user?id={target_user.id})\n"
-            f"➢ Profile Photos: {photo_count} Photos\n"
-            f"➢ Health: {health_percentage}%\n"
-            f"    {health_bar}\n"
-        )
-        
-        user_profile_photos = await context.bot.get_user_profile_photos(target_user.id, limit=1)
-        if user_profile_photos.total_count > 0:
-            await update.message.reply_photo(photo=user_profile_photos.photos[0][-1].file_id, caption=info_message, parse_mode='Markdown')
-        else:
-            await update.message.reply_text(info_message, parse_mode='Markdown')
-    except Exception as e:
-        logger.error(f"Error in info command: {e}")
-        await update.message.reply_text("Could not retrieve user information.")
+    info_text = (
+        f"🎯 User Spotlight: {user.first_name} 🎯\n"
+        f"ID: `{user.id}`\n"
+        f"Username: {f'@{user.username}' if user.username else 'None'}\n"
+        f"Ready to rock this group! 🚀"
+    )
+    await message.reply_text(info_text, parse_mode="Markdown")
+
+async def stat_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    chat = update.effective_chat
+    if chat.type not in ["group", "supergroup"]:
+        await update.message.reply_text("This command works only in groups!")
+        return
+    
+    chat_id = str(chat.id)
+    today = datetime.now().date()
+    yesterday = today - timedelta(days=1)
+    month_start = today.replace(day=1)
+    
+    today_count = sum(user["daily"].get(today, 0) for user in message_counts.get(chat_id, {}).values())
+    yesterday_count = sum(user["daily"].get(yesterday, 0) for user in message_counts.get(chat_id, {}).values())
+    monthly_count = sum(user["monthly"] for user in message_counts.get(chat_id, {}).values())
+    
+    stats = (
+        f"📊 Group Stats for {chat.title} 📊\n"
+        f"Today: {today_count} messages\n"
+        f"Yesterday: {yesterday_count} messages\n"
+        f"This Month: {monthly_count} messages\n"
+        f"Keep the chatter going! 🔥"
+    )
+    await update.message.reply_text(stats)
 
 async def mute_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat = update.effective_chat
-    user = update.effective_user
+    message = update.effective_message
+    user = message.from_user
     
-    if not update.message.reply_to_message:
-        await update.message.reply_text("Please reply to a user to mute them.")
+    if chat.type not in ["group", "supergroup"]:
+        await message.reply_text("This command works only in groups!")
         return
     
-    target_user = update.message.reply_to_message.from_user
+    admins = await chat.get_administrators()
+    if user.id not in [admin.user.id for admin in admins]:
+        await message.reply_text("Only admins can mute people, punk! 😛")
+        return
     
-    try:
-        command_user_member = await context.bot.get_chat_member(chat.id, user.id)
-        target_user_member = await context.bot.get_chat_member(chat.id, target_user.id)
-        
-        if target_user_member.status in ['administrator', 'creator']:
-            await update.message.reply_text(random.choice([
-                "🚫 Nice try! I can't mute an admin!",
-                "😂 Oops! Admins are immune to mute magic!"
-            ]))
-            return
-        
-        if command_user_member.status in ['administrator', 'creator']:
-            await context.bot.restrict_chat_member(
-                chat.id, target_user.id, permissions=ChatPermissions(can_send_messages=False)
-            )
-            await update.message.reply_text(f"🤫 {target_user.first_name} has been muted!")
-        else:
-            await update.message.reply_text("Only admins can use this command.")
-    except Exception as e:
-        logger.error(f"Error in mute command: {e}")
-        await update.message.reply_text("Could not complete the mute action.")
-
-async def top_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    chat = update.effective_chat
+    if not message.reply_to_message:
+        await message.reply_text("Reply to someone to mute them, genius!")
+        return
     
-    try:
-        admins = await context.bot.get_chat_administrators(chat.id)
-        sorted_admins = sorted(
-            admins,
-            key=lambda a: sum(log['count'] for log in message_logs.get(chat.id, {}).get(a.user.id, [])),
-            reverse=True
+    target = message.reply_to_message.from_user
+    if target.id in [admin.user.id for admin in admins]:
+        await message.reply_text(
+            f"Hey {user.first_name}, you stupid? You think I’m gonna mute an admin like {target.first_name}? "
+            "Get outta here with that nonsense! 😂"
         )
-        
-        top_admins_message = "🏆 Top Administrators:\n\n"
-        for idx, admin in enumerate(sorted_admins[:5], 1):
-            message_count = sum(log['count'] for log in message_logs.get(chat.id, {}).get(admin.user.id, []))
-            top_admins_message += (
-                f"{idx}. {admin.user.first_name} {admin.user.last_name or ''}\n"
-                f"   Role: {admin.status}\n"
-                f"   Messages: {message_count}\n\n"
-            )
-        await update.message.reply_text(top_admins_message)
-    except Exception as e:
-        logger.error(f"Error in top command: {e}")
-        await update.message.reply_text("Could not retrieve top administrators.")
+    else:
+        await chat.restrict_member(target.id, permissions={"can_send_messages": False})
+        await message.reply_text(f"{target.first_name} has been muted! Silence is golden! 🤫")
 
-async def active_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def unmute_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat = update.effective_chat
+    message = update.effective_message
+    user = message.from_user
     
-    try:
-        total_members = await context.bot.get_chat_member_count(chat.id)
-        group_message_counts = message_logs.get(chat.id, {})
-        
-        ACTIVE_THRESHOLD = 10
-        active_members = [
-            user_id for user_id, logs in group_message_counts.items()
-            if sum(log['count'] for log in logs) >= ACTIVE_THRESHOLD
-        ]
-        
-        active_message = (
-            f"📊 Group Activity Report\n\n"
-            f"👥 Total Members: {total_members}\n"
-            f"🌟 Active Members: {len(active_members)}\n"
-            f"📈 Activity Threshold: {ACTIVE_THRESHOLD} messages\n\n"
-            "🔥 Top Active Members:\n"
-        )
-        
-        sorted_active = sorted(
-            active_members,
-            key=lambda uid: sum(log['count'] for log in group_message_counts.get(uid, [])),
-            reverse=True
-        )
-        
-        for idx, user_id in enumerate(sorted_active[:10], 1):
-            try:
-                user = await context.bot.get_chat_member(chat.id, user_id)
-                message_count = sum(log['count'] for log in group_message_counts.get(user_id, []))
-                active_message += (
-                    f"{idx}. {user.user.first_name} {user.user.last_name or ''}\n"
-                    f"   💬 Messages: {message_count}\n"
-                )
-            except Exception:
-                continue
-        await update.message.reply_text(active_message)
-    except Exception as e:
-        logger.error(f"Error in active command: {e}")
-        await update.message.reply_text("Could not retrieve group activity.")
+    if chat.type not in ["group", "supergroup"]:
+        await message.reply_text("This command works only in groups!")
+        return
+    
+    admins = await chat.get_administrators()
+    if user.id not in [admin.user.id for admin in admins]:
+        await message.reply_text("Only admins can unmute, buddy! 😛")
+        return
+    
+    if not message.reply_to_message:
+        await message.reply_text("Reply to someone to unmute them!")
+        return
+    
+    target = message.reply_to_message.from_user
+    await chat.restrict_member(target.id, permissions={"can_send_messages": True})
+    await message.reply_text(f"{target.first_name} is free from the mute dungeon! Speak up, champ! 🎉")
 
-async def track_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.message and update.effective_chat.type in ['group', 'supergroup']:
-        chat_id = update.effective_chat.id
-        user_id = update.effective_user.id
-        current_time = datetime.now()
-        
-        if chat_id not in message_logs:
-            message_logs[chat_id] = {}
-        if user_id not in message_logs[chat_id]:
-            message_logs[chat_id][user_id] = []
-        
-        message_logs[chat_id][user_id].append({'timestamp': current_time, 'count': 1})
-
-async def leaderboard_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def members_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat = update.effective_chat
-    bot = context.bot
-    time_filter = context.args[0] if context.args else 'all'
+    message = update.effective_message
+    user = message.from_user
     
-    try:
-        chat_members = await bot.get_chat_administrators(chat.id)
-        now = datetime.now()
-        leaderboard = []
-        
-        for user_id, message_log in message_logs.get(chat.id, {}).items():
-            if time_filter == 'today':
-                filtered_messages = [log for log in message_log if (now - log['timestamp']).days < 1]
-            elif time_filter == 'yesterday':
-                filtered_messages = [log for log in message_log if 1 <= (now - log['timestamp']).days < 2]
-            elif time_filter == 'month':
-                filtered_messages = [log for log in message_log if (now - log['timestamp']).days < 30]
-            else:
-                filtered_messages = message_log
-            
-            total_messages = len(filtered_messages)
-            user_member = next((m for m in chat_members if m.user.id == user_id), None)
-            
-            if user_member and total_messages > 0:
-                leaderboard.append({
-                    'user_id': user_id,
-                    'name': user_member.user.first_name,
-                    'username': user_member.user.username,
-                    'messages': total_messages
-                })
-        
-        leaderboard.sort(key=lambda x: x['messages'], reverse=True)
-        total_messages = sum(user['messages'] for user in leaderboard)
-        leaderboard_message = "📈 LEADERBOARD\n\n"
-        for idx, user in enumerate(leaderboard[:10], 1):
-            username = f"@{user['username']}" if user['username'] else user['name']
-            user_link = f"https://t.me/{user['username']}" if user['username'] else f"tg://user?id={user['user_id']}"
-            leaderboard_message += (
-                f"{idx}. {'👤' if idx % 2 == 0 else '👦🏻'} "
-                f"[{user['name']}]({user_link}) • {user['messages']} msg\n"
-            )
-        
-        leaderboard_message += f"\n✉️ Total messages: {total_messages}"
-        keyboard = [
-            [
-                InlineKeyboardButton("Today", callback_data="stat_today"),
-                InlineKeyboardButton("Yesterday", callback_data="stat_yesterday"),
-                InlineKeyboardButton("This Month", callback_data="stat_month")
-            ]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        
-        chat_photo = await bot.get_chat(chat.id)
-        if chat_photo.photo:
-            await update.message.reply_photo(
-                photo=chat_photo.photo.big_file_id,
-                caption=leaderboard_message,
-                reply_markup=reply_markup,
-                parse_mode='Markdown'
-            )
-        else:
-            await update.message.reply_text(
-                leaderboard_message,
-                reply_markup=reply_markup,
-                parse_mode='Markdown'
-            )
-    except Exception as e:
-        logger.error(f"Error in leaderboard command: {e}")
-        await update.message.reply_text("Could not retrieve group statistics.")
+    if chat.type not in ["group", "supergroup"]:
+        await message.reply_text("Yo, this command is for groups only! Try it there! 😉")
+        return
+    
+    admins = await chat.get_administrators()
+    if user.id not in [admin.user.id for admin in admins]:
+        await message.reply_text("Only admins can summon the crew with /members! 😛")
+        return
+    
+    members = await chat.get_members()
+    member_list = [m.user for m in members if not m.user.is_bot]
+    if not member_list:
+        await message.reply_text("No members to tag? This group’s a ghost town! 👻")
+        return
+    
+    await message.reply_text("Calling all members! Assemble! 🔔")
+    for i in range(0, len(member_list), 8):
+        batch = member_list[i:i+8]
+        tags = " ".join(f"@{m.username}" if m.username else m.first_name for m in batch)
+        try:
+            await context.bot.send_message(chat_id=chat.id, text=tags)
+            time.sleep(2)  # 2-second delay
+        except Forbidden:
+            await message.reply_text("Can’t tag some folks—privacy settings, ya know!")
+            break
 
+async def rank_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    chat = update.effective_chat
+    if chat.type not in ["group", "supergroup"]:
+        await update.message.reply_text("This command works only in groups!")
+        return
+    
+    chat_id = str(chat.id)
+    if chat_id not in message_counts or not message_counts[chat_id]:
+        await update.message.reply_text("No chatter yet! Start talking to climb the ranks! 😛")
+        return
+    
+    ranked = sorted(
+        message_counts[chat_id].items(),
+        key=lambda x: x[1]["monthly"],
+        reverse=True
+    )[:5]  # Top 5
+    
+    rank_text = f"🏆 Top Chatterboxes in {chat.title} 🏆\n"
+    for i, (user_id, data) in enumerate(ranked, 1):
+        user = await context.bot.get_chat_member(chat_id, int(user_id))
+        rank_text += f"{i}. {user.user.first_name} - {data['monthly']} messages\n"
+    
+    await update.message.reply_text(rank_text)
+
+# Placeholder for callback (if needed later)
 async def handle_stat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    query = update.callback_query
-    await query.answer()
-    time_filter = query.data.split('_')[1]
-    context.args = [time_filter]
-    await leaderboard_command(update, context)
+    pass
