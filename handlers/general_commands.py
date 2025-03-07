@@ -80,16 +80,17 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             reply_markup = InlineKeyboardMarkup(back_button)
             await query.edit_message_text(summaries[data], reply_markup=reply_markup)
         elif data == "add_to_group":
-            # List all groups the user is in (based on bot's known chats)
+            # List all groups the user is in (where bot tracks messages)
+            user = update.effective_user if not query.from_user else query.from_user
             user_groups = [chat for chat_id, chat in chat_data.items() if chat_id in message_counts and str(user.id) in message_counts[chat_id]]
             if not user_groups:
-                await query.edit_message_text("I don’t see you in any groups I’m in! Add me manually!")
+                await query.edit_message_text("I don’t see you in any groups I’m in! Add me manually with an invite link!")
                 return
             
             keyboard = [[InlineKeyboardButton(group["title"], callback_data=f"invite_{chat_id}")] 
                        for chat_id, group in chat_data.items() if chat_id in message_counts and str(user.id) in message_counts[chat_id]]
             reply_markup = InlineKeyboardMarkup(keyboard)
-            await query.edit_message_text("Pick a group I’m already in to get an invite:", reply_markup=reply_markup)
+            await query.edit_message_text("Pick a group to add me to:", reply_markup=reply_markup)
         elif data.startswith("invite_"):
             chat_id = data.split("_")[1]
             try:
@@ -98,10 +99,11 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
                     member_limit=1,
                     name=f"Invite by {user.first_name}"
                 )
-                await context.bot.send_message(
-                    chat_id=chat.id,
-                    text=f"Here’s the invite link for {chat_data[chat_id]['title']}:\n{invite_link.invite_link}\n"
-                         "I’ll need permissions like ban, delete messages, etc. (not admin promotion) when added!"
+                keyboard = [[InlineKeyboardButton("Add me to another group", callback_data="add_to_group")]]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                await query.edit_message_text(
+                    text=f"Here’s the invite link for {chat_data[chat_id]['title']}:\n{invite_link.invite_link}",
+                    reply_markup=reply_markup
                 )
             except TelegramError as e:
                 await query.edit_message_text(f"Couldn’t create invite for {chat_data[chat_id]['title']}: {e}")

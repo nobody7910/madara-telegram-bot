@@ -2,7 +2,7 @@
 import logging
 import time
 from datetime import datetime, timedelta
-from telegram import Update
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from telegram.error import Forbidden, TelegramError
 
@@ -121,6 +121,13 @@ async def kick_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         return
     
     admins = await chat.get_administrators()
+    bot_member = await chat.get_member(context.bot.id)
+    if not bot_member.can_restrict_members:
+        keyboard = [[InlineKeyboardButton("Grant Permissions", url=f"https://t.me/{context.bot.username}?start=permissions_{chat.id}")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await message.reply_text("I need an admin post to do these things!", reply_markup=reply_markup)
+        return
+    
     if user.id not in [admin.user.id for admin in admins]:
         await message.reply_text("Only admins can kick people, bro! 😛")
         return
@@ -143,7 +150,6 @@ async def kick_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     except TelegramError as e:
         await message.reply_text(f"Couldn’t kick {target.first_name}: {e}")
 
-# --- No changes below this line ---
 async def mute_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat = update.effective_chat
     message = update.effective_message
@@ -154,6 +160,13 @@ async def mute_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         return
     
     admins = await chat.get_administrators()
+    bot_member = await chat.get_member(context.bot.id)
+    if not bot_member.can_restrict_members:
+        keyboard = [[InlineKeyboardButton("Grant Permissions", url=f"https://t.me/{context.bot.username}?start=permissions_{chat.id}")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await message.reply_text("I need an admin post to do these things!", reply_markup=reply_markup)
+        return
+    
     if user.id not in [admin.user.id for admin in admins]:
         await message.reply_text("Only admins can mute people, punk! 😛")
         return
@@ -181,6 +194,13 @@ async def unmute_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         return
     
     admins = await chat.get_administrators()
+    bot_member = await chat.get_member(context.bot.id)
+    if not bot_member.can_restrict_members:
+        keyboard = [[InlineKeyboardButton("Grant Permissions", url=f"https://t.me/{context.bot.username}?start=permissions_{chat.id}")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await message.reply_text("I need an admin post to do these things!", reply_markup=reply_markup)
+        return
+    
     if user.id not in [admin.user.id for admin in admins]:
         await message.reply_text("Only admins can unmute, buddy! 😛")
         return
@@ -203,6 +223,13 @@ async def members_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         return
     
     admins = await chat.get_administrators()
+    bot_member = await chat.get_member(context.bot.id)
+    if not bot_member.can_restrict_members:  # Using as a proxy for general perms
+        keyboard = [[InlineKeyboardButton("Grant Permissions", url=f"https://t.me/{context.bot.username}?start=permissions_{chat.id}")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await message.reply_text("I need an admin post to do these things!", reply_markup=reply_markup)
+        return
+    
     if user.id not in [admin.user.id for admin in admins]:
         await message.reply_text("Only admins can summon the crew with /members! 😛")
         return
@@ -228,6 +255,61 @@ async def members_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     except TelegramError as e:
         await message.reply_text(f"Oops, something went wrong: {e}")
 
+async def warn_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    chat = update.effective_chat
+    message = update.effective_message
+    user = message.from_user
+    
+    if chat.type not in ["group", "supergroup"]:
+        await message.reply_text("This command works only in groups!")
+        return
+    
+    admins = await chat.get_administrators()
+    bot_member = await chat.get_member(context.bot.id)
+    if not bot_member.can_restrict_members:
+        keyboard = [[InlineKeyboardButton("Grant Permissions", url=f"https://t.me/{context.bot.username}?start=permissions_{chat.id}")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await message.reply_text("I need an admin post to do these things!", reply_markup=reply_markup)
+        return
+    
+    if user.id not in [admin.user.id for admin in admins]:
+        await message.reply_text("Only admins can warn people, dude! 😛")
+        return
+    
+    if not message.reply_to_message:
+        await message.reply_text("Reply to someone to warn them!")
+        return
+    
+    target = message.reply_to_message.from_user
+    if target.id in [admin.user.id for admin in admins]:
+        await message.reply_text(
+            f"Yo {user.first_name}, warning an admin like {target.first_name}? Nah, that’s a bold move I won’t touch! 😂"
+        )
+        return
+    
+    chat_id = str(chat.id)
+    user_id = str(target.id)
+    if chat_id not in warnings:
+        warnings[chat_id] = {}
+    if user_id not in warnings[chat_id]:
+        warnings[chat_id][user_id] = 0
+    
+    warnings[chat_id][user_id] += 1
+    warn_count = warnings[chat_id][user_id]
+    
+    if warn_count >= 3:
+        try:
+            await chat.ban_member(target.id)
+            await message.reply_text(f"{target.first_name} hit 3 warnings—bam, banned! 👋")
+            del warnings[chat_id][user_id]
+        except TelegramError as e:
+            await message.reply_text(f"Couldn’t ban {target.first_name}: {e}")
+    else:
+        await message.reply_text(
+            f"⚠️ {target.first_name}, you’ve been warned! {warn_count}/3 strikes—shape up or ship out!"
+        )
+
+# --- No changes below this line ---
 async def rank_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat = update.effective_chat
     if chat.type not in ["group", "supergroup"]:
@@ -294,53 +376,6 @@ async def active_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         f"Get in on the action! 😎"
     )
     await update.message.reply_text(active_text)
-
-async def warn_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    chat = update.effective_chat
-    message = update.effective_message
-    user = message.from_user
-    
-    if chat.type not in ["group", "supergroup"]:
-        await message.reply_text("This command works only in groups!")
-        return
-    
-    admins = await chat.get_administrators()
-    if user.id not in [admin.user.id for admin in admins]:
-        await message.reply_text("Only admins can warn people, dude! 😛")
-        return
-    
-    if not message.reply_to_message:
-        await message.reply_text("Reply to someone to warn them!")
-        return
-    
-    target = message.reply_to_message.from_user
-    if target.id in [admin.user.id for admin in admins]:
-        await message.reply_text(
-            f"Yo {user.first_name}, warning an admin like {target.first_name}? Nah, that’s a bold move I won’t touch! 😂"
-        )
-        return
-    
-    chat_id = str(chat.id)
-    user_id = str(target.id)
-    if chat_id not in warnings:
-        warnings[chat_id] = {}
-    if user_id not in warnings[chat_id]:
-        warnings[chat_id][user_id] = 0
-    
-    warnings[chat_id][user_id] += 1
-    warn_count = warnings[chat_id][user_id]
-    
-    if warn_count >= 3:
-        try:
-            await chat.ban_member(target.id)
-            await message.reply_text(f"{target.first_name} hit 3 warnings—bam, banned! 👋")
-            del warnings[chat_id][user_id]
-        except TelegramError as e:
-            await message.reply_text(f"Couldn’t ban {target.first_name}: {e}")
-    else:
-        await message.reply_text(
-            f"⚠️ {target.first_name}, you’ve been warned! {warn_count}/3 strikes—shape up or ship out!"
-        )
 
 async def leaderboard_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await rank_command(update, context)
