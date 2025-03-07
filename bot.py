@@ -27,19 +27,17 @@ logger = logging.getLogger(__name__)
 
 def register_handlers(application):
     logger.info("Registering handlers...")
-    # PM Commands
     application.add_handler(CommandHandler("start", pm_start, filters=filters.ChatType.PRIVATE))
     application.add_handler(CommandHandler("help", help_command))
-    # Group Commands
     application.add_handler(CommandHandler("start", general_start, filters=filters.ChatType.GROUPS))
-    application.add_handler(CommandHandler("photo", get_user_info))  # Reusing for PFP
+    application.add_handler(CommandHandler("photo", get_user_info))
     application.add_handler(CommandHandler("info", info_command))
     application.add_handler(CommandHandler("stat", stat_command))
     application.add_handler(CommandHandler("mute", mute_command))
     application.add_handler(CommandHandler("unmute", unmute_command))
     application.add_handler(CommandHandler("members", members_command))
     application.add_handler(CommandHandler("rank", rank_command))
-    application.add_handler(CommandHandler("top", top_command))  # Fixed import
+    application.add_handler(CommandHandler("top", top_command))
     application.add_handler(CommandHandler("group_stats", get_group_stats))
     application.add_handler(CommandHandler("top_members", get_top_members))
     application.add_handler(CommandHandler("message_freq", get_message_frequency))

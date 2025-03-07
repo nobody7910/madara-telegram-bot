@@ -12,24 +12,19 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     photos = await context.bot.get_user_profile_photos(user.id, limit=1)
     intro = (
         f"🎉 Yo yo, {user.first_name}! Welcome to the party! 🎉\n"
-        "I’m your friendly neighborhood bot—hit /help for the rundown!"
+        "I’m your slick bot—hit /help for the rundown!"
     )
     
     if photos.photos:
-        await context.bot.send_photo(
-            chat_id=chat.id,
-            photo=photos.photos[0][-1].file_id,
-            caption=intro
-        )
+        await context.bot.send_photo(chat_id=chat.id, photo=photos.photos[0][-1].file_id, caption=intro)
     else:
         await context.bot.send_message(chat_id=chat.id, text=intro)
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat = update.effective_chat
     query = update.callback_query
-    is_callback = bool(query)
     
-    if not is_callback:  # Initial /help command
+    if not query:  # Initial /help
         keyboard = [
             [InlineKeyboardButton("ℹ️ Info", callback_data="help_info"),
              InlineKeyboardButton("📸 Photo", callback_data="help_photo")],
@@ -43,42 +38,27 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
              InlineKeyboardButton("⚠️ Warn", callback_data="help_warn")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        
-        bot_photos = await context.bot.get_user_profile_photos(context.bot.id, limit=1)
         help_text = (
             "Yo! I’m your slick bot! 😎\n"
             "Tap a button to see what I can do!\n\n"
             "Commands: /help, /info, /photo, /stat, /members, /top, /mute, /unmute, /active, /rank, /warn"
         )
-        
-        if bot_photos.photos:
-            await context.bot.send_photo(
-                chat_id=chat.id,
-                photo=bot_photos.photos[0][-1].file_id,
-                caption=help_text,
-                reply_markup=reply_markup
-            )
-        else:
-            await context.bot.send_message(
-                chat_id=chat.id,
-                text=help_text,
-                reply_markup=reply_markup
-            )
-    else:  # Handle button clicks
+        await context.bot.send_message(chat_id=chat.id, text=help_text, reply_markup=reply_markup)
+    else:  # Button click
         data = query.data
         summaries = {
-            "help_info": "ℹ️ /info - Drops a slick profile card with PFP, bio, and more!",
-            "help_photo": "📸 /photo - Shows up to 3 recent PFPs of you or a replied user!",
-            "help_stat": "📊 /stat - Group stats with PFP—today, yesterday, monthly vibes!",
+            "help_info": "ℹ️ /info - Shows user PFP + dope details like ID, bio, and more!",
+            "help_photo": "📸 /photo - Grabs up to 3 recent PFPs of you or a replied user!",
+            "help_stat": "📊 /stat - Group PFP + message stats (today, yesterday, monthly)!",
             "help_members": "👥 /members [msg] - Tags all members (8 per msg, 2-sec delay) with a shoutout (admins only)!",
             "help_top": "🏆 /top - Top 3 chatterboxes in the group!",
-            "help_mute": "🔇 /mute - Mutes a user (admins only, sassy if it’s an admin)!",
+            "help_mute": "🔇 /mute - Mutes a user (admins only, sassy for admins)!",
             "help_unmute": "🔊 /unmute - Unmutes a user (admins only)!",
-            "help_active": "🌟 /active - Counts active users in the last 24 hours!",
+            "help_active": "🌟 /active - Counts active users in the last 24h!",
             "help_rank": "🥇 /rank - Ranks top 5 message senders!",
             "help_warn": "⚠️ /warn - Warns a user (admins only, 3 strikes = ban)!"
         }
         if data in summaries:
-            await query.edit_message_text(text=summaries[data], reply_markup=None)
+            await query.edit_message_text(summaries[data])
         else:
-            await query.answer("Something went wonky—try again!")
+            await query.answer("Oops, something’s off—try again!")
