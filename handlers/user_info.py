@@ -14,12 +14,13 @@ async def get_user_info(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     if chat.type in ["group", "supergroup"] and message.reply_to_message:
         user = message.reply_to_message.from_user
     
-    photos = await context.bot.get_user_profile_photos(user.id, limit=1)
+    photos = await context.bot.get_user_profile_photos(user.id, limit=3)  # Get up to 3 recent PFPs
     if photos.photos:
-        await context.bot.send_photo(
-            chat_id=chat.id,
-            photo=photos.photos[0][-1].file_id,
-            caption=f"Here’s {user.first_name}’s epic PFP! 🔥"
-        )
+        for photo in photos.photos:
+            await context.bot.send_photo(
+                chat_id=chat.id,
+                photo=photo[-1].file_id,  # Largest size
+                caption=f"One of {user.first_name}’s recent PFPs! 🔥"
+            )
     else:
-        await message.reply_text(f"Oops, {user.first_name} has no PFP to flaunt! 😛")
+        await message.reply_text(f"Oops, {user.first_name} has no PFPs to show off! 😛")

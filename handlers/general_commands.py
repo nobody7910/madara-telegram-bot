@@ -28,57 +28,59 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat = update.effective_chat
-    user = update.effective_user
-    is_group = chat.type in ["group", "supergroup"]
-    
-    # Command list with buttons
-    keyboard = [
-        [InlineKeyboardButton("📊 Stat", callback_data="help_stat"),
-         InlineKeyboardButton("ℹ️ Info", callback_data="help_info")],
-        [InlineKeyboardButton("📸 Photo", callback_data="help_photo"),
-         InlineKeyboardButton("🔇 Mute", callback_data="help_mute")],
-        [InlineKeyboardButton("🔊 Unmute", callback_data="help_unmute"),
-         InlineKeyboardButton("👥 Members", callback_data="help_members")],
-        [InlineKeyboardButton("🏆 Rank", callback_data="help_rank")]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    
-    # Bot PFP
-    bot_photos = await context.bot.get_user_profile_photos(context.bot.id, limit=1)
-    help_text = (
-        "Hey there! I’m your cool bot! 😎\n"
-        "Click a button to see what I can do!"
-    )
-    
-    if bot_photos.photos:
-        await context.bot.send_photo(
-            chat_id=chat.id,
-            photo=bot_photos.photos[0][-1].file_id,
-            caption=help_text,
-            reply_markup=reply_markup
-        )
-    else:
-        await context.bot.send_message(
-            chat_id=chat.id,
-            text=help_text,
-            reply_markup=reply_markup
-        )
-
-    # Handle button clicks
     query = update.callback_query
-    if query:
+    is_callback = bool(query)
+    
+    if not is_callback:  # Initial /help command
+        keyboard = [
+            [InlineKeyboardButton("ℹ️ Info", callback_data="help_info"),
+             InlineKeyboardButton("📸 Photo", callback_data="help_photo")],
+            [InlineKeyboardButton("📊 Stat", callback_data="help_stat"),
+             InlineKeyboardButton("👥 Members", callback_data="help_members")],
+            [InlineKeyboardButton("🏆 Top", callback_data="help_top"),
+             InlineKeyboardButton("🔇 Mute", callback_data="help_mute")],
+            [InlineKeyboardButton("🔊 Unmute", callback_data="help_unmute"),
+             InlineKeyboardButton("🌟 Active", callback_data="help_active")],
+            [InlineKeyboardButton("🥇 Rank", callback_data="help_rank"),
+             InlineKeyboardButton("📈 Stats", callback_data="help_stats")],
+            [InlineKeyboardButton("🚀 Start", callback_data="help_start")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        bot_photos = await context.bot.get_user_profile_photos(context.bot.id, limit=1)
+        help_text = (
+            "Hey there! I’m your cool bot! 😎\n"
+            "Click a button to see what I can do!\n\n"
+            "Commands: /help, /info, /start, /stats, /stat, /members, /top, /mute, /photo, /active, /unmute, /rank"
+        )
+        
+        if bot_photos.photos:
+            await context.bot.send_photo(
+                chat_id=chat.id,
+                photo=bot_photos.photos[0][-1].file_id,
+                caption=help_text,
+                reply_markup=reply_markup
+            )
+        else:
+            await context.bot.send_message(
+                chat_id=chat.id,
+                text=help_text,
+                reply_markup=reply_markup
+            )
+    else:  # Handle button clicks
         data = query.data
-        if data == "help_stat":
-            await query.edit_message_text("📊 /stat - Shows group message stats (today, yesterday, monthly).")
-        elif data == "help_info":
-            await query.edit_message_text("ℹ️ /info - Get dope info about a user!")
-        elif data == "help_photo":
-            await query.edit_message_text("📸 /photo - Snag your PFP or a replied user’s in groups!")
-        elif data == "help_mute":
-            await query.edit_message_text("🔇 /mute - Silence someone (admins only, with sass for admin targets)!")
-        elif data == "help_unmute":
-            await query.edit_message_text("🔊 /unmute - Free someone from the mute dungeon!")
-        elif data == "help_members":
-            await query.edit_message_text("👥 /members - Tags all group members (admins only, 8 at a time, 2-sec delay).")
-        elif data == "help_rank":
-            await query.edit_message_text("🏆 /rank - See the top chatterboxes in the group!")
+        summaries = {
+            "help_info": "ℹ️ /info - Get dope info about a user, including their bio!",
+            "help_photo": "📸 /photo - Snag recent PFPs of yourself or a replied user!",
+            "help_stat": "📊 /stat - Shows group message stats (today, yesterday, monthly).",
+            "help_members": "👥 /members [msg] - Tags all group members with an optional message (admins only).",
+            "help_top": "🏆 /top - Lists the top 3 chatterboxes in the group!",
+            "help_mute": "🔇 /mute - Silence someone (admins only, sassy if targeting an admin)!",
+            "help_unmute": "🔊 /unmute - Free someone from mute (admins only)!",
+            "help_active": "🌟 /active - Coming soon: Shows recently active users!",
+            "help_rank": "🥇 /rank - Ranks top 5 message senders in the group!",
+            "help_stats": "📈 /stats - Alias for /stat, group message stats!",
+            "help_start": "🚀 /start - Kick off with your PFP and a fun intro!"
+        }
+        if data in summaries:
+            await query.edit_message_text(summaries[data])

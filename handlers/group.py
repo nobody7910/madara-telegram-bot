@@ -35,10 +35,15 @@ async def info_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     message = update.effective_message
     user = message.from_user if not message.reply_to_message else message.reply_to_message.from_user
     
+    # Get user bio
+    user_info = await context.bot.get_chat(user.id)
+    bio = user_info.bio if user_info.bio else "No bio set—mysterious, huh?"
+    
     info_text = (
         f"🎯 User Spotlight: {user.first_name} 🎯\n"
         f"ID: `{user.id}`\n"
         f"Username: {f'@{user.username}' if user.username else 'None'}\n"
+        f"Bio: {bio}\n"
         f"Ready to rock this group! 🚀"
     )
     await message.reply_text(info_text, parse_mode="Markdown")
@@ -131,18 +136,21 @@ async def members_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await message.reply_text("Only admins can summon the crew with /members! 😛")
         return
     
+    # Check for custom message
+    custom_msg = " ".join(context.args) if context.args else "Yo, assemble!"
+    await message.reply_text(f"Tagging all members! {custom_msg} 🔔")
+    
     members = await chat.get_members()
     member_list = [m.user for m in members if not m.user.is_bot]
     if not member_list:
         await message.reply_text("No members to tag? This group’s a ghost town! 👻")
         return
     
-    await message.reply_text("Calling all members! Assemble! 🔔")
     for i in range(0, len(member_list), 8):
         batch = member_list[i:i+8]
         tags = " ".join(f"@{m.username}" if m.username else m.first_name for m in batch)
         try:
-            await context.bot.send_message(chat_id=chat.id, text=tags)
+            await context.bot.send_message(chat_id=chat.id, text=f"{custom_msg} {tags}")
             time.sleep(2)  # 2-second delay
         except Forbidden:
             await message.reply_text("Can’t tag some folks—privacy settings, ya know!")
@@ -173,7 +181,6 @@ async def rank_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     await update.message.reply_text(rank_text)
 
 async def top_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    # Reusing rank_command logic for simplicity
     chat = update.effective_chat
     if chat.type not in ["group", "supergroup"]:
         await update.message.reply_text("This command works only in groups!")
@@ -188,7 +195,7 @@ async def top_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         message_counts[chat_id].items(),
         key=lambda x: x[1]["monthly"],
         reverse=True
-    )[:3]  # Top 3 for brevity
+    )[:3]  # Top 3
     
     top_text = f"👑 Top Dogs in {chat.title} 👑\n"
     for i, (user_id, data) in enumerate(ranked, 1):
@@ -198,12 +205,10 @@ async def top_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     await update.message.reply_text(top_text)
 
 async def active_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    # Placeholder for active users (could track recent activity)
     await update.message.reply_text("Active users feature coming soon! Stay tuned! 😉")
 
 async def leaderboard_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    # Alias for rank_command
     await rank_command(update, context)
 
 async def handle_stat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    pass  # Placeholder for future callbacks
+    pass
