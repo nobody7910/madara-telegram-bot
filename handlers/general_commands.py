@@ -36,7 +36,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     chat = update.effective_chat
     query = update.callback_query
     
-    if not query:  # Initial /help
+    if not query or query.data == "help_back":  # Initial /help or Back button
         keyboard = [
             [InlineKeyboardButton("ℹ️ Info", callback_data="help_info"),
              InlineKeyboardButton("📸 Photo", callback_data="help_photo")],
@@ -56,13 +56,16 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             "Tap a button to see what I can do!\n\n"
             "Commands: /help, /info, /photo, /stat, /members, /top, /mute, /unmute, /active, /rank, /warn, /kick"
         )
-        await context.bot.send_message(chat_id=chat.id, text=help_text, reply_markup=reply_markup)
+        if query:
+            await query.edit_message_text(text=help_text, reply_markup=reply_markup)
+        else:
+            await context.bot.send_message(chat_id=chat.id, text=help_text, reply_markup=reply_markup)
     else:  # Button click
         data = query.data
         summaries = {
             "help_info": "ℹ️ /info - Shows user PFP + dope details like ID, bio, and more!",
             "help_photo": "📸 /photo - Grabs up to 3 recent PFPs of you or a replied user!",
-            "help_stat": "📊 /stat - Group PFP + message stats (today, yesterday, monthly)!",
+            "help_stat": "📊 /stat - Bot PFP + message stats (today, yesterday, monthly)!",
             "help_members": "👥 /members [msg] - Tags all members (8 per msg, 2-sec delay) with a shoutout (admins only)!",
             "help_top": "🏆 /top - Top 3 chatterboxes in the group!",
             "help_mute": "🔇 /mute - Mutes a user (admins only, sassy for admins)!",
@@ -76,19 +79,17 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             back_button = [[InlineKeyboardButton("⬅️ Back", callback_data="help_back")]]
             reply_markup = InlineKeyboardMarkup(back_button)
             await query.edit_message_text(summaries[data], reply_markup=reply_markup)
-        elif data == "help_back":
-            await help_command(update, context)  # Reset to initial help menu
         elif data == "add_to_group":
-            # Fetch user's groups (approximation via bot's known chats)
-            user_groups = [chat for chat_id, chat in chat_data.items() if user.id in chat["admins"]]
+            # List all groups the user is in (based on bot's known chats)
+            user_groups = [chat for chat_id, chat in chat_data.items() if chat_id in message_counts and str(user.id) in message_counts[chat_id]]
             if not user_groups:
-                await query.edit_message_text("I couldn’t find any groups you’re an admin in! Add me manually!")
+                await query.edit_message_text("I don’t see you in any groups I’m in! Add me manually!")
                 return
             
             keyboard = [[InlineKeyboardButton(group["title"], callback_data=f"invite_{chat_id}")] 
-                       for chat_id, group in chat_data.items() if user.id in group["admins"]]
+                       for chat_id, group in chat_data.items() if chat_id in message_counts and str(user.id) in message_counts[chat_id]]
             reply_markup = InlineKeyboardMarkup(keyboard)
-            await query.edit_message_text("Pick a group to add me to:", reply_markup=reply_markup)
+            await query.edit_message_text("Pick a group I’m already in to get an invite:", reply_markup=reply_markup)
         elif data.startswith("invite_"):
             chat_id = data.split("_")[1]
             try:

@@ -101,10 +101,11 @@ async def stat_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         f"Keep the chatter going! 🔥"
     )
     
-    chat_info = await context.bot.get_chat(chat_id)
-    if chat_info.photo:
+    bot = await context.bot.get_me()
+    bot_photos = await context.bot.get_user_profile_photos(bot.id, limit=1)
+    if bot_photos.photos:
         await update.message.reply_photo(
-            photo=chat_info.photo.big_file_id,
+            photo=bot_photos.photos[0][-1].file_id,
             caption=stats
         )
     else:
