@@ -49,7 +49,7 @@ async def info_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     try:
         user_info = await context.bot.get_chat(user.id)
         photos = await context.bot.get_user_profile_photos(user.id, limit=1)
-        bio = user_info.bio if user_info.bio else "No bio—keeping it low-key!"
+        bio = user_info.bio if user_info.bio else "No bio set—mysterious, huh?"
         photo_count = (await context.bot.get_user_profile_photos(user.id)).total_count
         
         if photos.photos:
@@ -62,15 +62,13 @@ async def info_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             f"➢ Last Name: {user.last_name if user.last_name else 'N/A'}\n"
             f"➢ Username: {f'@{user.username}' if user.username else 'N/A'}\n"
             f"➢ Mention: {user.mention_markdown_v2()}\n"
-            f"➢ DC ID: N/A\n"
+            f"➢ DC ID: N/A\n"  # Not available via Bot API
             f"➢ Bio: {bio}\n\n"
             f"➢ Custom Bio: N/A\n"
             f"➢ Custom Tag: N/A\n"
-            f"➢ Profile Photos: {photo_count} Photos\n"
+            f"➢ Profile Photos: {photo_count}\n"
             f"➢ Health: 100%\n"
-            f"    ▰▰▰▰▰▰▰▰▰▰\n\n"
-            f"➢ AFK Status: No\n"
-            f"➢ Common Groups: N/A"  # API limitation
+            f"    ▰▰▰▰▰▰▰▰▰▰"
         )
         await message.reply_text(info_text, parse_mode="MarkdownV2")
     except TelegramError as e:
@@ -99,11 +97,11 @@ async def stat_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         )
     
     stats = (
-        f"📊 Group Stats 📊\n"
+        f"📊 Group Stats for {chat.title} 📊\n"
         f"Today: {today_count} messages\n"
         f"Yesterday: {yesterday_count} messages\n"
         f"This Month: {monthly_count} messages\n"
-        f"Keep it lit! 🔥"
+        f"Keep the chatter going! 🔥"
     )
     await update.message.reply_text(stats)
 
@@ -184,7 +182,7 @@ async def members_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             batch = member_list[i:i+8]
             tags = " ".join(f"@{m.username}" if m.username else m.first_name for m in batch)
             await context.bot.send_message(chat_id=chat.id, text=f"{custom_msg} {tags}")
-            if i + 8 < len(member_list):  # Delay except for last batch
+            if i + 8 < len(member_list):
                 time.sleep(2)
     except Forbidden:
         await message.reply_text("Can’t tag some folks—check my permissions!")
