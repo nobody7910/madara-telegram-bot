@@ -9,9 +9,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
     chat = update.effective_chat
     
-    # Log for debugging
-    logger.info(f"Start command triggered by {user.id} in chat {chat.id}, type: {chat.type}")
-    
     photos = await context.bot.get_user_profile_photos(user.id, limit=1)
     intro = (
         f"🎉 Yo yo, {user.first_name}! Welcome to the party! 🎉\n"
@@ -21,22 +18,19 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     keyboard = [[InlineKeyboardButton("Add me to a group", callback_data="add_to_group")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    if chat.type == "private" or chat.type in ["group", "supergroup"]:
-        if photos.photos:
-            await context.bot.send_photo(
-                chat_id=chat.id,
-                photo=photos.photos[0][-1].file_id,
-                caption=intro,
-                reply_markup=reply_markup
-            )
-        else:
-            await context.bot.send_message(
-                chat_id=chat.id,
-                text=intro,
-                reply_markup=reply_markup
-            )
+    if photos.photos:
+        await context.bot.send_photo(
+            chat_id=chat.id,
+            photo=photos.photos[0][-1].file_id,
+            caption=intro,
+            reply_markup=reply_markup
+        )
     else:
-        await context.bot.send_message(chat_id=chat.id, text="Yo, use me in PM or a group!")
+        await context.bot.send_message(
+            chat_id=chat.id,
+            text=intro,
+            reply_markup=reply_markup
+        )
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat = update.effective_chat
@@ -87,7 +81,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             await query.edit_message_text(summaries[data], reply_markup=reply_markup)
         elif data == "add_to_group":
             # List all groups the user is in (where bot tracks messages)
-            user = update.effective_user if not query.from_user else query.from_user
+            user = query.from_user
             user_groups = [chat for chat_id, chat in chat_data.items() if chat_id in message_counts and str(user.id) in message_counts[chat_id]]
             if not user_groups:
                 await query.edit_message_text("I don’t see you in any groups I’m in! Add me manually with an invite link!")
@@ -105,10 +99,11 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
                     member_limit=1,
                     name=f"Invite by {user.first_name}"
                 )
-                keyboard = [[InlineKeyboardButton("Add me to another group", callback_data="add_to_group")]]
+                # Refresh the process with the original button
+                keyboard = [[InlineKeyboardButton("Add me to a group", callback_data="add_to_group")]]
                 reply_markup = InlineKeyboardMarkup(keyboard)
                 await query.edit_message_text(
-                    text=f"Here’s the invite link for {chat_data[chat_id]['title']}:\n{invite_link.invite_link}",
+                    text=f"Bot added! Here’s the invite link for {chat_data[chat_id]['title']}:\n{invite_link.invite_link}",
                     reply_markup=reply_markup
                 )
             except TelegramError as e:
