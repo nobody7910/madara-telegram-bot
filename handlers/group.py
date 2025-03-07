@@ -52,18 +52,31 @@ async def info_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         bio = user_info.bio if user_info.bio else "No bio set—mysterious, huh?"
         photo_count = (await context.bot.get_user_profile_photos(user.id)).total_count
         
+        # Escape special characters for MarkdownV2
+        def escape_md2(text):
+            chars = r"""_*[]()~`>#+-=|{}.!"""
+            for char in chars:
+                text = text.replace(char, f"\\{char}")
+            return text
+        
+        username = f"@{user.username}" if user.username else "N/A"
+        mention = user.mention_markdown_v2()
+        bio_safe = escape_md2(bio)
+        first_name_safe = escape_md2(user.first_name)
+        last_name_safe = escape_md2(user.last_name) if user.last_name else "N/A"
+        
         if photos.photos:
             await context.bot.send_photo(chat_id=chat.id, photo=photos.photos[0][-1].file_id)
         
         info_text = (
             f"【 User Information 】\n"
             f"➢ ID: `{user.id}`\n"
-            f"➢ First Name: {user.first_name}\n"
-            f"➢ Last Name: {user.last_name if user.last_name else 'N/A'}\n"
-            f"➢ Username: {f'@{user.username}' if user.username else 'N/A'}\n"
-            f"➢ Mention: {user.mention_markdown_v2()}\n"
-            f"➢ DC ID: N/A\n"  # Not available via Bot API
-            f"➢ Bio: {bio}\n\n"
+            f"➢ First Name: {first_name_safe}\n"
+            f"➢ Last Name: {last_name_safe}\n"
+            f"➢ Username: {escape_md2(username)}\n"
+            f"➢ Mention: {mention}\n"
+            f"➢ DC ID: N/A\n"
+            f"➢ Bio: {bio_safe}\n\n"
             f"➢ Custom Bio: N/A\n"
             f"➢ Custom Tag: N/A\n"
             f"➢ Profile Photos: {photo_count}\n"
