@@ -50,18 +50,31 @@ async def info_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         user_info = await context.bot.get_chat(user.id)
         photos = await context.bot.get_user_profile_photos(user.id, limit=1)
         bio = user_info.bio if user_info.bio else "No bio set—mysterious, huh?"
-        
-        if photos.photos:
-            await context.bot.send_photo(chat_id=chat.id, photo=photos.photos[0][-1].file_id)
+        photo_count = (await context.bot.get_user_profile_photos(user.id)).total_count
         
         info_text = (
-            f"【 User Info 】\n"
-            f"ID: {user.id}\n"
-            f"First Name: {user.first_name}\n"
-            f"Username: @{user.username if user.username else 'N/A'}\n"
-            f"Bio: {bio}"
+            f"【 User Information 】\n"
+            f"➢ ID: {user.id}\n"
+            f"➢ First Name: {user.first_name}\n"
+            f"➢ Last Name: {user.last_name if user.last_name else 'N/A'}\n"
+            f"➢ Username: @{user.username if user.username else 'N/A'}\n"
+            f"➢ Mention: {user.first_name}\n"
+            f"➢ DC ID: N/A\n"
+            f"➢ Bio: {bio}\n\n"
+            f"➢ Custom Bio: N/A\n"
+            f"➢ Custom Tag: N/A\n"
+            f"➢ Profile Photos: {photo_count}\n"
+            f"➢ Health: 100%\n"
+            f"    ▰▰▰▰▰▰▰▰▰▰"
         )
-        await message.reply_text(info_text)
+        
+        if photos.photos:
+            await message.reply_photo(
+                photo=photos.photos[0][-1].file_id,
+                caption=info_text
+            )
+        else:
+            await message.reply_text(info_text)
     except TelegramError as e:
         await message.reply_text(f"Couldn’t fetch info for {user.first_name}: {e}")
 
@@ -80,14 +93,6 @@ async def stat_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     yesterday_count = sum(user["daily"].get(yesterday, 0) for user in message_counts.get(chat_id, {}).values())
     monthly_count = sum(user["monthly"] for user in message_counts.get(chat_id, {}).values())
     
-    chat_info = await context.bot.get_chat(chat_id)
-    if chat_info.photo:
-        await context.bot.send_photo(
-            chat_id=chat.id,
-            photo=chat_info.photo.big_file_id,
-            caption=f"🏠 {chat.title}"
-        )
-    
     stats = (
         f"📊 Group Stats for {chat.title} 📊\n"
         f"Today: {today_count} messages\n"
@@ -95,8 +100,49 @@ async def stat_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         f"This Month: {monthly_count} messages\n"
         f"Keep the chatter going! 🔥"
     )
-    await update.message.reply_text(stats)
+    
+    chat_info = await context.bot.get_chat(chat_id)
+    if chat_info.photo:
+        await update.message.reply_photo(
+            photo=chat_info.photo.big_file_id,
+            caption=stats
+        )
+    else:
+        await update.message.reply_text(stats)
 
+async def kick_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    chat = update.effective_chat
+    message = update.effective_message
+    user = message.from_user
+    
+    if chat.type not in ["group", "supergroup"]:
+        await message.reply_text("This command works only in groups!")
+        return
+    
+    admins = await chat.get_administrators()
+    if user.id not in [admin.user.id for admin in admins]:
+        await message.reply_text("Only admins can kick people, bro! 😛")
+        return
+    
+    if not message.reply_to_message:
+        await message.reply_text("Reply to someone to kick them!")
+        return
+    
+    target = message.reply_to_message.from_user
+    if target.id in [admin.user.id for admin in admins]:
+        await message.reply_text(
+            f"Yo {user.first_name}, kicking an admin like {target.first_name}? That’s a no-go! 😂"
+        )
+        return
+    
+    try:
+        await chat.ban_member(target.id)
+        await chat.unban_member(target.id)  # Ban then unban = kick
+        await message.reply_text(f"{target.first_name} got the boot! See ya! 👢")
+    except TelegramError as e:
+        await message.reply_text(f"Couldn’t kick {target.first_name}: {e}")
+
+# --- No changes below this line ---
 async def mute_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat = update.effective_chat
     message = update.effective_message

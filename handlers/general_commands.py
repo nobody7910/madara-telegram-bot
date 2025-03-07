@@ -12,13 +12,25 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     photos = await context.bot.get_user_profile_photos(user.id, limit=1)
     intro = (
         f"🎉 Yo yo, {user.first_name}! Welcome to the party! 🎉\n"
-        "I’m your slick bot—hit /help for the rundown!"
+        f"I’m your slick bot—hit /help for the rundown!\n"
     )
     
+    keyboard = [[InlineKeyboardButton("Add me to a group", callback_data="add_to_group")]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
     if photos.photos:
-        await context.bot.send_photo(chat_id=chat.id, photo=photos.photos[0][-1].file_id, caption=intro)
+        await context.bot.send_photo(
+            chat_id=chat.id,
+            photo=photos.photos[0][-1].file_id,
+            caption=intro,
+            reply_markup=reply_markup
+        )
     else:
-        await context.bot.send_message(chat_id=chat.id, text=intro)
+        await context.bot.send_message(
+            chat_id=chat.id,
+            text=intro,
+            reply_markup=reply_markup
+        )
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat = update.effective_chat
@@ -35,13 +47,14 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             [InlineKeyboardButton("🔊 Unmute", callback_data="help_unmute"),
              InlineKeyboardButton("🌟 Active", callback_data="help_active")],
             [InlineKeyboardButton("🥇 Rank", callback_data="help_rank"),
-             InlineKeyboardButton("⚠️ Warn", callback_data="help_warn")]
+             InlineKeyboardButton("⚠️ Warn", callback_data="help_warn")],
+            [InlineKeyboardButton("👢 Kick", callback_data="help_kick")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         help_text = (
             "Yo! I’m your slick bot! 😎\n"
             "Tap a button to see what I can do!\n\n"
-            "Commands: /help, /info, /photo, /stat, /members, /top, /mute, /unmute, /active, /rank, /warn"
+            "Commands: /help, /info, /photo, /stat, /members, /top, /mute, /unmute, /active, /rank, /warn, /kick"
         )
         await context.bot.send_message(chat_id=chat.id, text=help_text, reply_markup=reply_markup)
     else:  # Button click
@@ -56,9 +69,40 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             "help_unmute": "🔊 /unmute - Unmutes a user (admins only)!",
             "help_active": "🌟 /active - Counts active users in the last 24h!",
             "help_rank": "🥇 /rank - Ranks top 5 message senders!",
-            "help_warn": "⚠️ /warn - Warns a user (admins only, 3 strikes = ban)!"
+            "help_warn": "⚠️ /warn - Warns a user (admins only, 3 strikes = ban)!",
+            "help_kick": "👢 /kick - Kicks a user out (admins only)!"
         }
         if data in summaries:
-            await query.edit_message_text(summaries[data])
+            back_button = [[InlineKeyboardButton("⬅️ Back", callback_data="help_back")]]
+            reply_markup = InlineKeyboardMarkup(back_button)
+            await query.edit_message_text(summaries[data], reply_markup=reply_markup)
+        elif data == "help_back":
+            await help_command(update, context)  # Reset to initial help menu
+        elif data == "add_to_group":
+            # Fetch user's groups (approximation via bot's known chats)
+            user_groups = [chat for chat_id, chat in chat_data.items() if user.id in chat["admins"]]
+            if not user_groups:
+                await query.edit_message_text("I couldn’t find any groups you’re an admin in! Add me manually!")
+                return
+            
+            keyboard = [[InlineKeyboardButton(group["title"], callback_data=f"invite_{chat_id}")] 
+                       for chat_id, group in chat_data.items() if user.id in group["admins"]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await query.edit_message_text("Pick a group to add me to:", reply_markup=reply_markup)
+        elif data.startswith("invite_"):
+            chat_id = data.split("_")[1]
+            try:
+                invite_link = await context.bot.create_chat_invite_link(
+                    chat_id=int(chat_id),
+                    member_limit=1,
+                    name=f"Invite by {user.first_name}"
+                )
+                await context.bot.send_message(
+                    chat_id=chat.id,
+                    text=f"Here’s the invite link for {chat_data[chat_id]['title']}:\n{invite_link.invite_link}\n"
+                         "I’ll need permissions like ban, delete messages, etc. (not admin promotion) when added!"
+                )
+            except TelegramError as e:
+                await query.edit_message_text(f"Couldn’t create invite for {chat_data[chat_id]['title']}: {e}")
         else:
             await query.answer("Oops, something’s off—try again!")
