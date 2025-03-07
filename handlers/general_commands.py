@@ -9,6 +9,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
     chat = update.effective_chat
     
+    # Log for debugging
+    logger.info(f"Start command triggered by {user.id} in chat {chat.id}, type: {chat.type}")
+    
     photos = await context.bot.get_user_profile_photos(user.id, limit=1)
     intro = (
         f"🎉 Yo yo, {user.first_name}! Welcome to the party! 🎉\n"
@@ -18,19 +21,22 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     keyboard = [[InlineKeyboardButton("Add me to a group", callback_data="add_to_group")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    if photos.photos:
-        await context.bot.send_photo(
-            chat_id=chat.id,
-            photo=photos.photos[0][-1].file_id,
-            caption=intro,
-            reply_markup=reply_markup
-        )
+    if chat.type == "private" or chat.type in ["group", "supergroup"]:
+        if photos.photos:
+            await context.bot.send_photo(
+                chat_id=chat.id,
+                photo=photos.photos[0][-1].file_id,
+                caption=intro,
+                reply_markup=reply_markup
+            )
+        else:
+            await context.bot.send_message(
+                chat_id=chat.id,
+                text=intro,
+                reply_markup=reply_markup
+            )
     else:
-        await context.bot.send_message(
-            chat_id=chat.id,
-            text=intro,
-            reply_markup=reply_markup
-        )
+        await context.bot.send_message(chat_id=chat.id, text="Yo, use me in PM or a group!")
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat = update.effective_chat
