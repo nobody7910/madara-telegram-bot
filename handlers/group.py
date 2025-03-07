@@ -2,14 +2,16 @@
 import logging
 import time
 from datetime import datetime, timedelta
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, Chat, ChatMember, User
 from telegram.ext import ContextTypes
-from telegram.error import Forbidden
+from telegram.error import Forbidden, TelegramError
 
 logger = logging.getLogger(__name__)
 
-# In-memory message tracking (use a DB for production)
+# In-memory storage
 message_counts = {}
+chat_data = {}
+warnings = {}  # New: Track warnings per user per chat
 
 async def track_messages(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat = update.effective_chat
@@ -24,29 +26,60 @@ async def track_messages(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     if chat_id not in message_counts:
         message_counts[chat_id] = {}
     if user_id not in message_counts[chat_id]:
-        message_counts[chat_id][user_id] = {"daily": {}, "monthly": 0}
+        message_counts[chat_id][user_id] = {"daily": {}, "monthly": 0, "last_seen": None}
     if today not in message_counts[chat_id][user_id]["daily"]:
         message_counts[chat_id][user_id]["daily"][today] = 0
     message_counts[chat_id][user_id]["daily"][today] += 1
     message_counts[chat_id][user_id]["monthly"] += 1
+    message_counts[chat_id][user_id]["last_seen"] = datetime.now()
+    
+    if chat_id not in chat_data:
+        chat_data[chat_id] = {
+            "title": chat.title,
+            "description": chat.description,
+            "member_count": await chat.get_member_count(),
+            "admins": [admin.user.id for admin in await chat.get_administrators()]
+        }
 
 async def info_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat = update.effective_chat
     message = update.effective_message
     user = message.from_user if not message.reply_to_message else message.reply_to_message.from_user
     
-    # Get user bio
-    user_info = await context.bot.get_chat(user.id)
-    bio = user_info.bio if user_info.bio else "No bio set—mysterious, huh?"
-    
-    info_text = (
-        f"🎯 User Spotlight: {user.first_name} 🎯\n"
-        f"ID: `{user.id}`\n"
-        f"Username: {f'@{user.username}' if user.username else 'None'}\n"
-        f"Bio: {bio}\n"
-        f"Ready to rock this group! 🚀"
-    )
-    await message.reply_text(info_text, parse_mode="Markdown")
+    try:
+        user_info = await context.bot.get_chat(user.id)
+        photos = await context.bot.get_user_profile_photos(user.id, limit=1)
+        bio = user_info.bio if user_info.bio else "No bio—keeping it low-key!"
+        photo_count = (await context.bot.get_user_profile_photos(user.id)).total_count
+        common_groups = len(await context.bot.get_chat_member_count(user.id)) if user.id != context.bot.id else 2
+        
+        if photos.photos:
+            await context.bot.send_photo(
+                chat_id=chat.id,
+                photo=photos.photos[0][-1].file_id,
+                caption=""
+            )
+        
+        info_text = (
+            f"【 User Information 】\n"
+            f"➢ ID: `{user.id}`\n"
+            f"➢ First Name: {user.first_name}\n"
+            f"➢ Last Name: {user.last_name if user.last_name else 'N/A'}\n"
+            f"➢ Username: {f'@{user.username}' if user.username else 'N/A'}\n"
+            f"➢ Mention: {user.mention_markdown_v2()}\n"
+            f"➢ DC ID: N/A (Not available via API)\n"
+            f"➢ Bio: {bio}\n\n"
+            f"➢ Custom Bio: N/A\n"
+            f"➢ Custom Tag: N/A\n"
+            f"➢ Profile Photos: {photo_count} Photos\n"
+            f"➢ Health: 100%\n"
+            f"    ▰▰▰▰▰▰▰▰▰▰\n\n"
+            f"➢ AFK Status: No\n"
+            f"➢ Common Groups: {common_groups}"
+        )
+        await message.reply_text(info_text, parse_mode="MarkdownV2")
+    except TelegramError as e:
+        await message.reply_text(f"Couldn’t fetch all info for {user.first_name}: {e}")
 
 async def stat_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat = update.effective_chat
@@ -62,13 +95,25 @@ async def stat_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     today_count = sum(user["daily"].get(today, 0) for user in message_counts.get(chat_id, {}).values())
     yesterday_count = sum(user["daily"].get(yesterday, 0) for user in message_counts.get(chat_id, {}).values())
     monthly_count = sum(user["monthly"] for user in message_counts.get(chat_id, {}).values())
+    member_count = await chat.get_member_count()
+    chat_info = chat_data.get(chat_id, {})
+    
+    chat_photos = await context.bot.get_chat(chat.id)
+    if chat_photos.photo:
+        await context.bot.send_photo(
+            chat_id=chat.id,
+            photo=chat_photos.photo.big_file_id,
+            caption=f"🏠 {chat.title}\n{chat_info.get('description', 'No intro—let’s make one!')}"
+        )
     
     stats = (
-        f"📊 Group Stats for {chat.title} 📊\n"
+        f"📊 Group Stats 📊\n"
         f"Today: {today_count} messages\n"
         f"Yesterday: {yesterday_count} messages\n"
         f"This Month: {monthly_count} messages\n"
-        f"Keep the chatter going! 🔥"
+        f"Total Members: {member_count}\n"
+        f"Admins: {len(chat_info.get('admins', []))}\n"
+        f"Keep it lit! 🔥"
     )
     await update.message.reply_text(stats)
 
@@ -136,9 +181,8 @@ async def members_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await message.reply_text("Only admins can summon the crew with /members! 😛")
         return
     
-    # Check for custom message
     custom_msg = " ".join(context.args) if context.args else "Yo, assemble!"
-    await message.reply_text(f"Tagging all members! {custom_msg} 🔔")
+    await message.reply_text(f"📢 Tagging all members! {custom_msg} 🔔")
     
     members = await chat.get_members()
     member_list = [m.user for m in members if not m.user.is_bot]
@@ -151,7 +195,8 @@ async def members_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         tags = " ".join(f"@{m.username}" if m.username else m.first_name for m in batch)
         try:
             await context.bot.send_message(chat_id=chat.id, text=f"{custom_msg} {tags}")
-            time.sleep(2)  # 2-second delay
+            if i + 8 < len(member_list):  # Don’t delay on the last batch
+                time.sleep(2)
         except Forbidden:
             await message.reply_text("Can’t tag some folks—privacy settings, ya know!")
             break
@@ -171,12 +216,15 @@ async def rank_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         message_counts[chat_id].items(),
         key=lambda x: x[1]["monthly"],
         reverse=True
-    )[:5]  # Top 5
+    )[:5]
     
     rank_text = f"🏆 Top Chatterboxes in {chat.title} 🏆\n"
     for i, (user_id, data) in enumerate(ranked, 1):
-        user = await context.bot.get_chat_member(chat_id, int(user_id))
-        rank_text += f"{i}. {user.user.first_name} - {data['monthly']} messages\n"
+        try:
+            member = await chat.get_member(int(user_id))
+            rank_text += f"{i}. {member.user.full_name} - {data['monthly']} msgs\n"
+        except TelegramError:
+            rank_text += f"{i}. User {user_id} - {data['monthly']} msgs (Gone?)\n"
     
     await update.message.reply_text(rank_text)
 
@@ -195,17 +243,89 @@ async def top_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         message_counts[chat_id].items(),
         key=lambda x: x[1]["monthly"],
         reverse=True
-    )[:3]  # Top 3
+    )[:3]
     
     top_text = f"👑 Top Dogs in {chat.title} 👑\n"
     for i, (user_id, data) in enumerate(ranked, 1):
-        user = await context.bot.get_chat_member(chat_id, int(user_id))
-        top_text += f"{i}. {user.user.first_name} - {data['monthly']} messages\n"
+        try:
+            member = await chat.get_member(int(user_id))
+            top_text += f"{i}. {member.user.full_name} - {data['monthly']} msgs\n"
+        except TelegramError:
+            top_text += f"{i}. User {user_id} - {data['monthly']} msgs (Gone?)\n"
     
     await update.message.reply_text(top_text)
 
 async def active_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_text("Active users feature coming soon! Stay tuned! 😉")
+    chat = update.effective_chat
+    if chat.type not in ["group", "supergroup"]:
+        await update.message.reply_text("This command works only in groups!")
+        return
+    
+    chat_id = str(chat.id)
+    if chat_id not in message_counts or not message_counts[chat_id]:
+        await update.message.reply_text("No activity yet! Get chatting! 😛")
+        return
+    
+    now = datetime.now()
+    active_users = [
+        (user_id, data) for user_id, data in message_counts[chat_id].items()
+        if data["last_seen"] and (now - data["last_seen"]) <= timedelta(hours=24)
+    ]
+    active_count = len(active_users)
+    active_text = (
+        f"🌟 Active Vibes in {chat.title} 🌟\n"
+        f"Active Users (Last 24h): {active_count}\n"
+        f"Total Members: {chat_data[chat_id]['member_count']}\n"
+        f"Get in on the action! 😎"
+    )
+    await update.message.reply_text(active_text)
+
+async def warn_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    chat = update.effective_chat
+    message = update.effective_message
+    user = message.from_user
+    
+    if chat.type not in ["group", "supergroup"]:
+        await message.reply_text("This command works only in groups!")
+        return
+    
+    admins = await chat.get_administrators()
+    if user.id not in [admin.user.id for admin in admins]:
+        await message.reply_text("Only admins can warn people, dude! 😛")
+        return
+    
+    if not message.reply_to_message:
+        await message.reply_text("Reply to someone to warn them!")
+        return
+    
+    target = message.reply_to_message.from_user
+    if target.id in [admin.user.id for admin in admins]:
+        await message.reply_text(
+            f"Yo {user.first_name}, warning an admin like {target.first_name}? Nah, that’s a bold move I won’t touch! 😂"
+        )
+        return
+    
+    chat_id = str(chat.id)
+    user_id = str(target.id)
+    if chat_id not in warnings:
+        warnings[chat_id] = {}
+    if user_id not in warnings[chat_id]:
+        warnings[chat_id][user_id] = 0
+    
+    warnings[chat_id][user_id] += 1
+    warn_count = warnings[chat_id][user_id]
+    
+    if warn_count >= 3:
+        try:
+            await chat.ban_member(target.id)
+            await message.reply_text(f"{target.first_name} hit 3 warnings—bam, banned! 👋")
+            del warnings[chat_id][user_id]  # Reset warnings
+        except TelegramError as e:
+            await message.reply_text(f"Couldn’t ban {target.first_name}: {e}")
+    else:
+        await message.reply_text(
+            f"⚠️ {target.first_name}, you’ve been warned! {warn_count}/3 strikes—shape up or ship out!"
+        )
 
 async def leaderboard_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await rank_command(update, context)

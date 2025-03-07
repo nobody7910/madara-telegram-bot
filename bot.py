@@ -15,7 +15,7 @@ from handlers.user_info import get_user_info
 from handlers.group import (
     stat_command, info_command, mute_command, unmute_command, top_command,
     active_command, track_messages, leaderboard_command, handle_stat_callback,
-    members_command, rank_command
+    members_command, rank_command, warn_command
 )
 from handlers.pm import start_command as pm_start
 
@@ -45,6 +45,7 @@ def register_handlers(application):
     application.add_handler(CommandHandler("message_freq", get_message_frequency))
     application.add_handler(CommandHandler("active", active_command))
     application.add_handler(CommandHandler("leaderboard", leaderboard_command))
+    application.add_handler(CommandHandler("warn", warn_command))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, track_messages))
     application.add_handler(CallbackQueryHandler(handle_stat_callback, pattern=r'^stat_'))
     application.add_handler(CallbackQueryHandler(help_command, pattern=r'^help_'))

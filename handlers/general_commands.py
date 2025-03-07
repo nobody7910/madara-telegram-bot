@@ -9,18 +9,16 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
     chat = update.effective_chat
     
-    # Fetch user profile photos
     photos = await context.bot.get_user_profile_photos(user.id, limit=1)
     intro = (
         f"🎉 Yo yo, {user.first_name}! Welcome to the party! 🎉\n"
-        "I’m your friendly neighborhood bot, here to spice up this group! "
-        "Check out my tricks with /help!"
+        "I’m your friendly neighborhood bot—hit /help for the rundown!"
     )
     
     if photos.photos:
         await context.bot.send_photo(
             chat_id=chat.id,
-            photo=photos.photos[0][-1].file_id,  # Largest size
+            photo=photos.photos[0][-1].file_id,
             caption=intro
         )
     else:
@@ -42,16 +40,15 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             [InlineKeyboardButton("🔊 Unmute", callback_data="help_unmute"),
              InlineKeyboardButton("🌟 Active", callback_data="help_active")],
             [InlineKeyboardButton("🥇 Rank", callback_data="help_rank"),
-             InlineKeyboardButton("📈 Stats", callback_data="help_stats")],
-            [InlineKeyboardButton("🚀 Start", callback_data="help_start")]
+             InlineKeyboardButton("⚠️ Warn", callback_data="help_warn")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         bot_photos = await context.bot.get_user_profile_photos(context.bot.id, limit=1)
         help_text = (
-            "Hey there! I’m your cool bot! 😎\n"
-            "Click a button to see what I can do!\n\n"
-            "Commands: /help, /info, /start, /stats, /stat, /members, /top, /mute, /photo, /active, /unmute, /rank"
+            "Yo! I’m your slick bot! 😎\n"
+            "Tap a button to see what I can do!\n\n"
+            "Commands: /help, /info, /photo, /stat, /members, /top, /mute, /unmute, /active, /rank, /warn"
         )
         
         if bot_photos.photos:
@@ -70,17 +67,18 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     else:  # Handle button clicks
         data = query.data
         summaries = {
-            "help_info": "ℹ️ /info - Get dope info about a user, including their bio!",
-            "help_photo": "📸 /photo - Snag recent PFPs of yourself or a replied user!",
-            "help_stat": "📊 /stat - Shows group message stats (today, yesterday, monthly).",
-            "help_members": "👥 /members [msg] - Tags all group members with an optional message (admins only).",
-            "help_top": "🏆 /top - Lists the top 3 chatterboxes in the group!",
-            "help_mute": "🔇 /mute - Silence someone (admins only, sassy if targeting an admin)!",
-            "help_unmute": "🔊 /unmute - Free someone from mute (admins only)!",
-            "help_active": "🌟 /active - Coming soon: Shows recently active users!",
-            "help_rank": "🥇 /rank - Ranks top 5 message senders in the group!",
-            "help_stats": "📈 /stats - Alias for /stat, group message stats!",
-            "help_start": "🚀 /start - Kick off with your PFP and a fun intro!"
+            "help_info": "ℹ️ /info - Drops a slick profile card with PFP, bio, and more!",
+            "help_photo": "📸 /photo - Shows up to 3 recent PFPs of you or a replied user!",
+            "help_stat": "📊 /stat - Group stats with PFP—today, yesterday, monthly vibes!",
+            "help_members": "👥 /members [msg] - Tags all members (8 per msg, 2-sec delay) with a shoutout (admins only)!",
+            "help_top": "🏆 /top - Top 3 chatterboxes in the group!",
+            "help_mute": "🔇 /mute - Mutes a user (admins only, sassy if it’s an admin)!",
+            "help_unmute": "🔊 /unmute - Unmutes a user (admins only)!",
+            "help_active": "🌟 /active - Counts active users in the last 24 hours!",
+            "help_rank": "🥇 /rank - Ranks top 5 message senders!",
+            "help_warn": "⚠️ /warn - Warns a user (admins only, 3 strikes = ban)!"
         }
         if data in summaries:
-            await query.edit_message_text(summaries[data])
+            await query.edit_message_text(text=summaries[data], reply_markup=None)
+        else:
+            await query.answer("Something went wonky—try again!")
