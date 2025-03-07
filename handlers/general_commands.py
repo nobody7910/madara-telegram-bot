@@ -2,6 +2,7 @@
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
+from handlers.group import chat_data, message_counts  # Import these from group.py
 
 logger = logging.getLogger(__name__)
 
@@ -99,7 +100,6 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
                     member_limit=1,
                     name=f"Invite by {user.first_name}"
                 )
-                # Refresh the process with the original button
                 keyboard = [[InlineKeyboardButton("Add me to a group", callback_data="add_to_group")]]
                 reply_markup = InlineKeyboardMarkup(keyboard)
                 await query.edit_message_text(
