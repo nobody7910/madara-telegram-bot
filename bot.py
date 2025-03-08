@@ -46,6 +46,16 @@ def register_handlers(application):
     
     # Fun commands (no admin needed)
     register_fun_handlers(application)
+    # bot.py (partial)
+def register_handlers(application):
+    logger.info("Registering handlers...")
+    application.add_handler(CommandHandler("start", start, filters=filters.ChatType.PRIVATE))
+    application.add_handler(CommandHandler("start", start, filters=filters.ChatType.GROUPS))
+    application.add_handler(CommandHandler("help", help_command))
+    application.add_handler(CallbackQueryHandler(help_command, pattern=r"help_"))
+    # ... rest of your handlers ...
+    register_fun_handlers(application)
+    # ... more handlers ...
 
     # Admin-only commands with check
     async def check_admin(update: Update, context: ContextTypes.DEFAULT_TYPE, cmd_func):

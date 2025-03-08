@@ -1,3 +1,5 @@
 python-telegram-bot==20.7
 Pillow>=9.0  # For image generation in /stat
 aiohttp>=3.8  # For waifu.pics API calls
+aiohttp>=3.8
+Pillow>=9.0
