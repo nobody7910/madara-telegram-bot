@@ -8,8 +8,9 @@ from telegram.ext import (
     filters,
     CallbackQueryHandler
 )
-from config import BOT_TOKEN
-from handlers.general_commands import start, help_command  # Updated to use start here
+import os
+BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "7702619386:AAEXCt9dt3SfcW5xZN4FKN77jr0HURovZS0")
+from handlers.general_commands import start, help_command
 from handlers.group_stats import get_group_stats, get_top_members, get_message_frequency
 from handlers.user_info import get_user_info
 from handlers.group import (
@@ -17,7 +18,6 @@ from handlers.group import (
     active_command, track_messages, leaderboard_command, handle_stat_callback,
     members_command, rank_command, warn_command, kick_command
 )
-# Removed: from handlers.pm import start_command as pm_start (we’re using general_commands.start)
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -27,7 +27,6 @@ logger = logging.getLogger(__name__)
 
 def register_handlers(application):
     logger.info("Registering handlers...")
-    # Unified /start for PM and groups using general_commands.start
     application.add_handler(CommandHandler("start", start, filters=filters.ChatType.PRIVATE))
     application.add_handler(CommandHandler("start", start, filters=filters.ChatType.GROUPS))
     application.add_handler(CommandHandler("help", help_command))
