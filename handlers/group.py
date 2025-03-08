@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 message_counts = {}
 chat_data = {}
 warnings = {}
+afk_users = defaultdict(lambda: {"time": None, "message": None})
 
 async def track_messages(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat = update.effective_chat
@@ -43,6 +44,15 @@ async def track_messages(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             "member_count": await chat.get_member_count(),
             "admins": [admin.user.id for admin in await chat.get_administrators()]
         }
+    
+    # AFK Check (integrated with your structure)
+    if (int(chat_id), int(user_id)) in afk_users:
+        afk_data = afk_users.pop((int(chat_id), int(user_id)))
+        duration = (datetime.now() - afk_data["time"]).total_seconds() // 60
+        await update.message.reply_text(
+            f"🎉 Welcome back, {user.first_name}! You were AFK for {duration} mins.\n"
+            f"Last AFK reason: {afk_data['message']}"
+        )
 
 async def info_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat = update.effective_chat
@@ -87,7 +97,7 @@ async def stat_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         await update.message.reply_text("Yo, this only works in groups!")
         return
     
-    chat_id = chat.id
+    chat_id = int(chat.id)  # Use int for consistency with callback
     await generate_leaderboard(update, context, chat_id, "all")
 
 async def generate_leaderboard(update: Update, context: ContextTypes.DEFAULT_TYPE, chat_id: int, period: str) -> None:
@@ -106,19 +116,36 @@ async def generate_leaderboard(update: Update, context: ContextTypes.DEFAULT_TYP
     # Get top 10 users
     users = []
     total_msgs = 0
-    for user_id, count in message_counts[chat_id].items():
+    chat_id_str = str(chat_id)
+    if chat_id_str not in message_counts:
+        await update.message.reply_text("No stats yet! Start chatting!")
+        return
+    
+    for user_id, data in message_counts[chat_id_str].items():
         try:
             user = await context.bot.get_chat_member(chat_id, int(user_id))
             username = user.user.username or user.user.first_name
             link = f"https://t.me/{user.user.username}" if user.user.username else ""
-            if period != "all":
-                # Placeholder for time-based filtering (add timestamp tracking later if needed)
+            if period == "today":
+                count = data["daily"].get(start_time.date(), 0)
+            elif period == "yesterday":
+                count = data["daily"].get(start_time.date(), 0)
+            elif period == "month":
+                count = sum(
+                    count for date, count in data["daily"].items()
+                    if date >= start_time.date()
+                )
+            else:  # all
+                count = data["monthly"]
+            if count > 0:  # Only include users with messages
                 users.append((username, link, count))
-            else:
-                users.append((username, link, count))
-            total_msgs += count
+                total_msgs += count
         except Exception as e:
             logger.error(f"Error fetching user {user_id}: {e}")
+    
+    if not users:
+        await update.message.reply_text(f"No messages found for {period}!")
+        return
     
     users = sorted(users, key=lambda x: x[2], reverse=True)[:10]
 
@@ -130,7 +157,7 @@ async def generate_leaderboard(update: Update, context: ContextTypes.DEFAULT_TYP
     except:
         font = ImageFont.load_default()
 
-    draw.text((20, 20), "📈 LEADERBOARD", font=font, fill=(255, 215, 0))  # Gold title
+    draw.text((20, 20), f"📈 LEADERBOARD ({period.capitalize()})", font=font, fill=(255, 215, 0))  # Gold title
     y = 80
     for i, (username, link, count) in enumerate(users, 1):
         emoji = "👤" if i > 2 else "👦🏻" if i == 2 else "👤"
@@ -353,7 +380,6 @@ async def warn_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             f"⚠️ {target.first_name}, you’ve been warned! {warn_count}/3 strikes—shape up or ship out!"
         )
 
-# --- No changes below this line ---
 async def rank_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat = update.effective_chat
     if chat.type not in ["group", "supergroup"]:
@@ -432,9 +458,6 @@ async def handle_stat_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         await generate_leaderboard(update, context, chat_id, period)
         await query.answer()
 
-        # handlers/group.py (continued)
-afk_users = defaultdict(lambda: {"time": None, "message": None})
-
 async def afk_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat = update.effective_chat
     user = update.effective_user
@@ -450,20 +473,3 @@ async def afk_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     
     afk_users[(chat_id, user_id)] = {"time": datetime.now(), "message": afk_msg}
     await update.message.reply_text(f"✨ {user.first_name} is now AFK! Reason: {afk_msg}")
-
-async def track_messages(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    chat = update.effective_chat
-    user = update.effective_user
-    if chat.type in ["group", "supergroup"]:
-        chat_id = chat.id
-        user_id = user.id
-        message_counts[chat_id][str(user_id)] += 1
-        
-        # Check AFK status
-        if (chat_id, user_id) in afk_users:
-            afk_data = afk_users.pop((chat_id, user_id))
-            duration = (datetime.now() - afk_data["time"]).total_seconds() // 60
-            await update.message.reply_text(
-                f"🎉 Welcome back, {user.first_name}! You were AFK for {duration} mins.\n"
-                f"Last AFK reason: {afk_data['message']}"
-            )

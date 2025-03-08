@@ -7,7 +7,7 @@ from telegram.ext import (
     MessageHandler,
     filters,
     CallbackQueryHandler,
-    ContextTypes  # Added this import
+    ContextTypes  # Fixed this
 )
 from config import BOT_TOKEN
 from handlers.general_commands import start, help_command
@@ -18,7 +18,7 @@ from handlers.group import (
     active_command, track_messages, leaderboard_command, handle_stat_callback,
     members_command, rank_command, warn_command, kick_command, afk_command
 )
-from handlers.fun import register_fun_handlers
+from handlers.fun import register_fun_handlers  # New fun commands handler
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -32,7 +32,7 @@ def register_handlers(application):
     application.add_handler(CommandHandler("start", start, filters=filters.ChatType.PRIVATE))
     application.add_handler(CommandHandler("start", start, filters=filters.ChatType.GROUPS))
     application.add_handler(CommandHandler("help", help_command))
-    application.add_handler(CommandHandler("photo", get_user_info))
+    application.add_handler(CommandHandler("photo", get_user_info))  # Renamed from user_info for consistency
     application.add_handler(CommandHandler("info", info_command))
     application.add_handler(CommandHandler("stat", stat_command))
     application.add_handler(CommandHandler("top", top_command))
