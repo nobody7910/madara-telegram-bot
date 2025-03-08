@@ -6,21 +6,43 @@ from telegram.ext import ContextTypes, CommandHandler
 
 logger = logging.getLogger(__name__)
 
+# Custom fallback images (replace these with your own hosted URLs)
+FALLBACK_IMAGES = {
+    "api_down": "https://yourcdn.com/fallback/api_down.jpg",
+    "no_image": "https://yourcdn.com/fallback/no_image.jpg",
+    "connection": "https://yourcdn.com/fallback/connection.jpg",
+    "oops": "https://yourcdn.com/fallback/oops.jpg"
+}
+
 async def fetch_waifu_image(category: str) -> str:
     try:
+        # More aggressive timeout and SSL tweak
         async with aiohttp.ClientSession() as session:
-            async with session.get(f"https://api.waifu.pics/sfw/{category}", timeout=aiohttp.ClientTimeout(total=10)) as resp:
+            logger.info(f"Fetching waifu image for category: {category}")
+            async with session.get(
+                f"https://api.waifu.pics/sfw/{category}",
+                timeout=aiohttp.ClientTimeout(total=5),  # Shorter timeout to fail fast
+                ssl=True  # Explicit SSL to avoid default issues
+            ) as resp:
                 if resp.status != 200:
-                    logger.error(f"Waifu API returned {resp.status} for category {category}")
-                    return "https://via.placeholder.com/400?text=API+Down"  # Fallback image
+                    logger.error(f"Waifu API returned {resp.status} for {category}")
+                    return FALLBACK_IMAGES["api_down"]
                 data = await resp.json()
-                return data.get("url", "https://via.placeholder.com/400?text=No+Image")
-    except (aiohttp.ClientConnectorError, aiohttp.ClientError) as e:
-        logger.error(f"Failed to fetch waifu image for {category}: {e}")
-        return "https://via.placeholder.com/400?text=Connection+Error"  # Fallback on connection fail
+                url = data.get("url")
+                if not url:
+                    logger.warning(f"No URL in response for {category}")
+                    return FALLBACK_IMAGES["no_image"]
+                logger.info(f"Got image URL: {url}")
+                return url
+    except aiohttp.ClientConnectorError as e:
+        logger.error(f"Connection error fetching {category}: {str(e)}")
+        return FALLBACK_IMAGES["connection"]
+    except aiohttp.ClientError as e:
+        logger.error(f"Client error fetching {category}: {str(e)}")
+        return FALLBACK_IMAGES["connection"]
     except Exception as e:
-        logger.error(f"Unexpected error in fetch_waifu_image: {e}")
-        return "https://via.placeholder.com/400?text=Oops"
+        logger.error(f"Unexpected error fetching {category}: {str(e)}")
+        return FALLBACK_IMAGES["oops"]
 
 async def generic_fun_command(update: Update, context: ContextTypes.DEFAULT_TYPE, category: str) -> None:
     chat = update.effective_chat
@@ -29,6 +51,7 @@ async def generic_fun_command(update: Update, context: ContextTypes.DEFAULT_TYPE
         await update.message.reply_text("Yo, this only works in groups!")
         return
     
+    logger.info(f"Fun command /{category} by {user.id} in chat {chat.id}")
     target = user
     if update.message.reply_to_message:
         target = update.message.reply_to_message.from_user
