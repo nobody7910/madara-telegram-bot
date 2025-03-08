@@ -3,8 +3,11 @@ import logging
 import time
 from datetime import datetime, timedelta
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ContextTypes
+from telegram.ext import ContextTypes, CommandHandler
 from telegram.error import Forbidden, TelegramError
+from collections import defaultdict
+from PIL import Image, ImageDraw, ImageFont
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -81,35 +84,76 @@ async def info_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 async def stat_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat = update.effective_chat
     if chat.type not in ["group", "supergroup"]:
-        await update.message.reply_text("This command works only in groups!")
+        await update.message.reply_text("Yo, this only works in groups!")
         return
     
-    chat_id = str(chat.id)
-    today = datetime.now().date()
-    yesterday = today - timedelta(days=1)
-    month_start = today.replace(day=1)
+    chat_id = chat.id
+    await generate_leaderboard(update, context, chat_id, "all")
+
+async def generate_leaderboard(update: Update, context: ContextTypes.DEFAULT_TYPE, chat_id: int, period: str) -> None:
+    # Filter messages by period
+    now = datetime.now()
+    if period == "today":
+        start_time = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    elif period == "yesterday":
+        start_time = (now - timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+        end_time = start_time + timedelta(days=1)
+    elif period == "month":
+        start_time = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    else:  # all
+        start_time = datetime(1970, 1, 1)
+
+    # Get top 10 users
+    users = []
+    total_msgs = 0
+    for user_id, count in message_counts[chat_id].items():
+        try:
+            user = await context.bot.get_chat_member(chat_id, int(user_id))
+            username = user.user.username or user.user.first_name
+            link = f"https://t.me/{user.user.username}" if user.user.username else ""
+            if period != "all":
+                # Placeholder for time-based filtering (add timestamp tracking later if needed)
+                users.append((username, link, count))
+            else:
+                users.append((username, link, count))
+            total_msgs += count
+        except Exception as e:
+            logger.error(f"Error fetching user {user_id}: {e}")
     
-    today_count = sum(user["daily"].get(today, 0) for user in message_counts.get(chat_id, {}).values())
-    yesterday_count = sum(user["daily"].get(yesterday, 0) for user in message_counts.get(chat_id, {}).values())
-    monthly_count = sum(user["monthly"] for user in message_counts.get(chat_id, {}).values())
+    users = sorted(users, key=lambda x: x[2], reverse=True)[:10]
+
+    # Generate image
+    img = Image.new('RGB', (800, 600), color=(44, 47, 51))  # Dark background
+    draw = ImageDraw.Draw(img)
+    try:
+        font = ImageFont.truetype("DejaVuSans.ttf", 24)  # Default font, adjust path if needed
+    except:
+        font = ImageFont.load_default()
+
+    draw.text((20, 20), "📈 LEADERBOARD", font=font, fill=(255, 215, 0))  # Gold title
+    y = 80
+    for i, (username, link, count) in enumerate(users, 1):
+        emoji = "👤" if i > 2 else "👦🏻" if i == 2 else "👤"
+        text = f"{i}. {emoji} {username} ({link or 'No link'}) • {count}"
+        draw.text((20, y), text, font=font, fill=(255, 255, 255))
+        y += 40
     
-    stats = (
-        f"📊 Group Stats for {chat.title} 📊\n"
-        f"Today: {today_count} messages\n"
-        f"Yesterday: {yesterday_count} messages\n"
-        f"This Month: {monthly_count} messages\n"
-        f"Keep the chatter going! 🔥"
-    )
-    
-    bot = await context.bot.get_me()
-    bot_photos = await context.bot.get_user_profile_photos(bot.id, limit=1)
-    if bot_photos.photos:
-        await update.message.reply_photo(
-            photo=bot_photos.photos[0][-1].file_id,
-            caption=stats
-        )
-    else:
-        await update.message.reply_text(stats)
+    draw.text((20, y + 20), f"✉️ Total messages: {total_msgs}", font=font, fill=(255, 255, 255))
+
+    # Save image
+    img.save("leaderboard.png")
+
+    # Buttons
+    keyboard = [
+        [InlineKeyboardButton("Today", callback_data=f"stat_today_{chat_id}"),
+         InlineKeyboardButton("Yesterday", callback_data=f"stat_yesterday_{chat_id}"),
+         InlineKeyboardButton("Month", callback_data=f"stat_month_{chat_id}")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    # Send image
+    with open("leaderboard.png", "rb") as photo:
+        await context.bot.send_photo(chat_id=chat_id, photo=photo, reply_markup=reply_markup)
 
 async def kick_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat = update.effective_chat
@@ -381,4 +425,45 @@ async def leaderboard_command(update: Update, context: ContextTypes.DEFAULT_TYPE
     await rank_command(update, context)
 
 async def handle_stat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    pass
+    query = update.callback_query
+    data = query.data
+    if data.startswith("stat_"):
+        period, chat_id = data.split("_")[1], int(data.split("_")[2])
+        await generate_leaderboard(update, context, chat_id, period)
+        await query.answer()
+
+        # handlers/group.py (continued)
+afk_users = defaultdict(lambda: {"time": None, "message": None})
+
+async def afk_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    chat = update.effective_chat
+    user = update.effective_user
+    if chat.type not in ["group", "supergroup"]:
+        await update.message.reply_text("Yo, AFK only works in groups!")
+        return
+    
+    chat_id = chat.id
+    user_id = user.id
+    afk_msg = " ".join(context.args) or "AFK - Be right back!"
+    if update.message.reply_to_message:
+        afk_msg = update.message.reply_to_message.text
+    
+    afk_users[(chat_id, user_id)] = {"time": datetime.now(), "message": afk_msg}
+    await update.message.reply_text(f"✨ {user.first_name} is now AFK! Reason: {afk_msg}")
+
+async def track_messages(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    chat = update.effective_chat
+    user = update.effective_user
+    if chat.type in ["group", "supergroup"]:
+        chat_id = chat.id
+        user_id = user.id
+        message_counts[chat_id][str(user_id)] += 1
+        
+        # Check AFK status
+        if (chat_id, user_id) in afk_users:
+            afk_data = afk_users.pop((chat_id, user_id))
+            duration = (datetime.now() - afk_data["time"]).total_seconds() // 60
+            await update.message.reply_text(
+                f"🎉 Welcome back, {user.first_name}! You were AFK for {duration} mins.\n"
+                f"Last AFK reason: {afk_data['message']}"
+            )

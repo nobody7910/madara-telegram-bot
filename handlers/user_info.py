@@ -1,4 +1,4 @@
-# handlers/user_info.py
+# handlers/user_info.py (unchanged, just confirming)
 import logging
 from telegram import Update
 from telegram.ext import ContextTypes
@@ -10,16 +10,15 @@ async def get_user_info(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     message = update.effective_message
     user = message.from_user
     
-    # Check for reply in groups
     if chat.type in ["group", "supergroup"] and message.reply_to_message:
         user = message.reply_to_message.from_user
     
-    photos = await context.bot.get_user_profile_photos(user.id, limit=3)  # Get up to 3 recent PFPs
+    photos = await context.bot.get_user_profile_photos(user.id, limit=3)
     if photos.photos:
         for photo in photos.photos:
             await context.bot.send_photo(
                 chat_id=chat.id,
-                photo=photo[-1].file_id,  # Largest size
+                photo=photo[-1].file_id,
                 caption=f"One of {user.first_name}’s recent PFPs! 🔥"
             )
     else:

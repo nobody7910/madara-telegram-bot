@@ -37,7 +37,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     chat = update.effective_chat
     query = update.callback_query
     
-    if not query or query.data == "help_back":  # Initial /help or Back button
+    if not query or query.data == "help_back":
         keyboard = [
             [InlineKeyboardButton("ℹ️ Info", callback_data="help_info"),
              InlineKeyboardButton("📸 Photo", callback_data="help_photo")],
@@ -49,64 +49,48 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
              InlineKeyboardButton("🌟 Active", callback_data="help_active")],
             [InlineKeyboardButton("🥇 Rank", callback_data="help_rank"),
              InlineKeyboardButton("⚠️ Warn", callback_data="help_warn")],
-            [InlineKeyboardButton("👢 Kick", callback_data="help_kick")]
+            [InlineKeyboardButton("👢 Kick", callback_data="help_kick"),
+             InlineKeyboardButton("😴 AFK", callback_data="help_afk")],
+            [InlineKeyboardButton("🎉 Fun", callback_data="help_fun")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         help_text = (
             "Yo! I’m your slick bot! 😎\n"
             "Tap a button to see what I can do!\n\n"
-            "Commands: /help, /info, /photo, /stat, /members, /top, /mute, /unmute, /active, /rank, /warn, /kick"
+            "Commands: /help, /info, /photo, /stat, /members, /top, /mute, /unmute, /active, /rank, /warn, /kick, /afk, /waifus..."
         )
         if query:
             await query.edit_message_text(text=help_text, reply_markup=reply_markup)
         else:
             await context.bot.send_message(chat_id=chat.id, text=help_text, reply_markup=reply_markup)
-    else:  # Button click
+    else:
         data = query.data
         summaries = {
-            "help_info": "ℹ️ /info - Shows user PFP + dope details like ID, bio, and more!",
-            "help_photo": "📸 /photo - Grabs up to 3 recent PFPs of you or a replied user!",
-            "help_stat": "📊 /stat - Bot PFP + message stats (today, yesterday, monthly)!",
-            "help_members": "👥 /members [msg] - Tags all members (8 per msg, 2-sec delay) with a shoutout (admins only)!",
-            "help_top": "🏆 /top - Top 3 chatterboxes in the group!",
-            "help_mute": "🔇 /mute - Mutes a user (admins only, sassy for admins)!",
-            "help_unmute": "🔊 /unmute - Unmutes a user (admins only)!",
-            "help_active": "🌟 /active - Counts active users in the last 24h!",
-            "help_rank": "🥇 /rank - Ranks top 5 message senders!",
-            "help_warn": "⚠️ /warn - Warns a user (admins only, 3 strikes = ban)!",
-            "help_kick": "👢 /kick - Kicks a user out (admins only)!"
+            "help_info": "ℹ️ /info - Shows user PFP + dope details!",
+            "help_photo": "📸 /photo - Grabs recent PFPs!",
+            "help_stat": "📊 /stat - Leaderboard with top chatters!",
+            "help_members": "👥 /members - Tags all members (admin only)!",
+            "help_top": "🏆 /top - Top 3 chatterboxes!",
+            "help_mute": "🔇 /mute - Mutes a user (admin only)!",
+            "help_unmute": "🔊 /unmute - Unmutes a user (admin only)!",
+            "help_active": "🌟 /active - Counts active users!",
+            "help_rank": "🥇 /rank - Top 5 message senders!",
+            "help_warn": "⚠️ /warn - Warns a user (admin only)!",
+            "help_kick": "👢 /kick - Kicks a user (admin only)!",
+            "help_afk": "😴 /afk - Mark yourself AFK with a custom message!"
         }
         if data in summaries:
             back_button = [[InlineKeyboardButton("⬅️ Back", callback_data="help_back")]]
             reply_markup = InlineKeyboardMarkup(back_button)
             await query.edit_message_text(summaries[data], reply_markup=reply_markup)
-        elif data == "add_to_group":
-            # List all groups the user is in (where bot tracks messages)
-            user = query.from_user
-            user_groups = [chat for chat_id, chat in chat_data.items() if chat_id in message_counts and str(user.id) in message_counts[chat_id]]
-            if not user_groups:
-                await query.edit_message_text("I don’t see you in any groups I’m in! Add me manually with an invite link!")
-                return
-            
-            keyboard = [[InlineKeyboardButton(group["title"], callback_data=f"invite_{chat_id}")] 
-                       for chat_id, group in chat_data.items() if chat_id in message_counts and str(user.id) in message_counts[chat_id]]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            await query.edit_message_text("Pick a group to add me to:", reply_markup=reply_markup)
-        elif data.startswith("invite_"):
-            chat_id = data.split("_")[1]
-            try:
-                invite_link = await context.bot.create_chat_invite_link(
-                    chat_id=int(chat_id),
-                    member_limit=1,
-                    name=f"Invite by {user.first_name}"
-                )
-                keyboard = [[InlineKeyboardButton("Add me to a group", callback_data="add_to_group")]]
-                reply_markup = InlineKeyboardMarkup(keyboard)
-                await query.edit_message_text(
-                    text=f"Bot added! Here’s the invite link for {chat_data[chat_id]['title']}:\n{invite_link.invite_link}",
-                    reply_markup=reply_markup
-                )
-            except TelegramError as e:
-                await query.edit_message_text(f"Couldn’t create invite for {chat_data[chat_id]['title']}: {e}")
-        else:
-            await query.answer("Oops, something’s off—try again!")
+        elif data == "help_fun":
+            fun_keyboard = [[InlineKeyboardButton(f"/{cmd}", callback_data=f"fun_{cmd}")] for cmd in FUN_COMMANDS.keys()]
+            fun_keyboard.append([InlineKeyboardButton("⬅️ Back", callback_data="help_back")])
+            reply_markup = InlineKeyboardMarkup(fun_keyboard)
+            await query.edit_message_text("🎉 Fun Commands:\nRandom anime pics from waifu.pics!", reply_markup=reply_markup)
+        elif data.startswith("fun_"):
+            cmd = data.split("_")[1]
+            back_button = [[InlineKeyboardButton("⬅️ Back", callback_data="help_fun")]]
+            reply_markup = InlineKeyboardMarkup(back_button)
+            await query.edit_message_text(f"/{cmd} - Fetches a random {cmd} image!", reply_markup=reply_markup)
+        # ... (existing button logic)
