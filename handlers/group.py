@@ -73,7 +73,7 @@ async def welcome_new_member(update: Update, context: ContextTypes.DEFAULT_TYPE)
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         if photos.photos:
-            await hyö.context.bot.send_photo(
+            await context.bot.send_photo(
                 chat_id=chat.id,
                 photo=photos.photos[0][-1].file_id,
                 caption=welcome_text,
@@ -187,6 +187,7 @@ async def generate_leaderboard(update: Update, context: ContextTypes.DEFAULT_TYP
     
     users = sorted(users, key=lambda x: x[2], reverse=True)[:10]
 
+    # Generate Image
     img = Image.new('RGB', (1000, 800), color=(44, 47, 51))
     draw = ImageDraw.Draw(img)
     for y in range(800):
@@ -196,12 +197,16 @@ async def generate_leaderboard(update: Update, context: ContextTypes.DEFAULT_TYP
         draw.line([(0, y), (1000, y)], fill=(r, g, b))
     
     try:
-        font = ImageFont.truetype("DejaVuSans.ttf", 30)
+        font_big = ImageFont.truetype("DejaVuSans.ttf", 40)  # Bigger font for title
+        font = ImageFont.truetype("DejaVuSans.ttf", 30)      # Regular font for rest
     except:
+        font_big = ImageFont.load_default()
         font = ImageFont.load_default()
 
-    draw.text((20, 20), f"📈 LEADERBOARD ({period.capitalize()})", font=font, fill=(255, 215, 0))
-    y = 80
+    # Small caps effect: Use uppercase for title
+    title_text = f"📈 Leaderboard ({period.capitalize()})".upper()
+    draw.text((20, 20), title_text, font=font_big, fill=(255, 215, 0))  # Gold, big, attractive
+    y = 100  # Adjusted for bigger title
     for i, (username, link, count) in enumerate(users, 1):
         emoji = "🥇" if i == 1 else "🥈" if i == 2 else "🥉" if i == 3 else "👤"
         text = f"{i}. {emoji} {username} ({link or 'No link'}) • {count}"
@@ -214,6 +219,17 @@ async def generate_leaderboard(update: Update, context: ContextTypes.DEFAULT_TYP
 
     img.save("leaderboard.png")
 
+    # Prepare Text Stats
+    text_stats = f"*📊 {period.capitalize()} Stats 📊*\n\n"
+    text_stats += "🏆 *Top Chatters:*\n"
+    for i, (username, link, count) in enumerate(users, 1):
+        emoji = "🥇" if i == 1 else "🥈" if i == 2 else "🥉" if i == 3 else "👤"
+        text_stats += f"{i}. {emoji} [{username}]({link or 'tg://user?id=' + str(user_id)}) • {count} msgs\n"
+    text_stats += f"\n✉️ *Total Messages:* {total_msgs}\n"
+    text_stats += f"🌟 *Active Users (24h):* {active_count}\n"
+    text_stats += f"👑 *Admins:* {admin_count}"
+
+    # Buttons
     keyboard = [
         [InlineKeyboardButton("Today", callback_data=f"stat_today_{chat_id}"),
          InlineKeyboardButton("Yesterday", callback_data=f"stat_yesterday_{chat_id}"),
@@ -221,8 +237,17 @@ async def generate_leaderboard(update: Update, context: ContextTypes.DEFAULT_TYP
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
+    # Send Image
     with open("leaderboard.png", "rb") as photo:
-        await context.bot.send_photo(chat_id=chat_id, photo=photo, reply_markup=reply_markup)
+        await context.bot.send_photo(chat_id=chat_id, photo=photo)
+
+    # Send Text Stats with Buttons
+    await context.bot.send_message(
+        chat_id=chat_id,
+        text=text_stats,
+        reply_markup=reply_markup,
+        parse_mode="Markdown"
+    )
 
 async def kick_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat = update.effective_chat
