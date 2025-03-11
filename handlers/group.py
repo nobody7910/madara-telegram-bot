@@ -149,13 +149,13 @@ async def generate_leaderboard(update: Update, context: ContextTypes.DEFAULT_TYP
     
     users = sorted(users, key=lambda x: x[2], reverse=True)[:10]
 
-    # Generate image
-    img = Image.new('RGB', (800, 600), color=(44, 47, 51))  # Dark background
+    # Generate image (Modified section)
+    img = Image.new('RGB', (1000, 800), color=(44, 47, 51))  # Larger image size
     draw = ImageDraw.Draw(img)
     try:
-        font = ImageFont.truetype("DejaVuSans.ttf", 24)  # Default font, adjust path if needed
+        font = ImageFont.truetype("DejaVuSans.ttf", 30)  # Bigger font size, assumes font in root
     except:
-        font = ImageFont.load_default()
+        font = ImageFont.load_default()  # Fallback if font not found
 
     draw.text((20, 20), f"📈 LEADERBOARD ({period.capitalize()})", font=font, fill=(255, 215, 0))  # Gold title
     y = 80
