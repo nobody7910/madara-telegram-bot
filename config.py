@@ -2,8 +2,10 @@
 import os
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv('/workspaces/madara-telegram-bot/.env')  # Explicit path
 
-BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN') or '7702619386:AAEXCt9dt3SfcW5xZN4FKN77jr0HURovZS0'
-API_ID = os.getenv('23882380')
-API_HASH = os.getenv('717f0a9521573f91562c2b3bd38f0b3c')
+BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
+API_ID = os.getenv('API_ID')
+API_HASH = os.getenv('API_HASH')
+
+print(f"Loaded BOT_TOKEN: {BOT_TOKEN}")

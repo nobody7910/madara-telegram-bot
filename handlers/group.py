@@ -3,7 +3,7 @@ import logging
 import time
 from datetime import datetime, timedelta
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ContextTypes, CommandHandler
+from telegram.ext import ContextTypes, CommandHandler, MessageHandler, filters
 from telegram.error import Forbidden, TelegramError
 from collections import defaultdict
 from PIL import Image, ImageDraw, ImageFont
@@ -11,7 +11,6 @@ import os
 
 logger = logging.getLogger(__name__)
 
-# In-memory storage
 message_counts = {}
 chat_data = {}
 warnings = {}
@@ -45,7 +44,6 @@ async def track_messages(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             "admins": [admin.user.id for admin in await chat.get_administrators()]
         }
     
-    # AFK Check (integrated with your structure)
     if (int(chat_id), int(user_id)) in afk_users:
         afk_data = afk_users.pop((int(chat_id), int(user_id)))
         duration = (datetime.now() - afk_data["time"]).total_seconds() // 60
@@ -53,6 +51,42 @@ async def track_messages(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             f"🎉 Welcome back, {user.first_name}! You were AFK for {duration} mins.\n"
             f"Last AFK reason: {afk_data['message']}"
         )
+
+async def welcome_new_member(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    chat = update.effective_chat
+    if chat.type not in ["group", "supergroup"]:
+        return
+    
+    new_members = update.message.new_chat_members
+    for member in new_members:
+        photos = await context.bot.get_user_profile_photos(member.id, limit=1)
+        member_link = f"https://t.me/{member.username}" if member.username else f"tg://user?id={member.id}"
+        welcome_text = (
+            f"🎉 Woohoo! A wild {member.first_name} has joined the party! 🎉\n"
+            f"Get ready for some epic vibes in *{chat.title}*! 🌟\n\n"
+            f"👤 Name: [{member.first_name}]({member_link})\n"
+            f"📛 Username: @{member.username if member.username else 'N/A'}\n"
+            f"🆔 ID: {member.id}\n"
+            f"Let’s make it legendary—follow the rules and enjoy! ☘️"
+        )
+        keyboard = [[InlineKeyboardButton("📜 Group Rules", url="https://t.me/RULES_FOR_GROUPS_791/3")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        if photos.photos:
+            await hyö.context.bot.send_photo(
+                chat_id=chat.id,
+                photo=photos.photos[0][-1].file_id,
+                caption=welcome_text,
+                parse_mode="Markdown",
+                reply_markup=reply_markup
+            )
+        else:
+            await context.bot.send_message(
+                chat_id=chat.id,
+                text=welcome_text,
+                reply_markup=reply_markup,
+                parse_mode="Markdown"
+            )
 
 async def info_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat = update.effective_chat
@@ -97,11 +131,10 @@ async def stat_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         await update.message.reply_text("Yo, this only works in groups!")
         return
     
-    chat_id = int(chat.id)  # Use int for consistency with callback
+    chat_id = int(chat.id)
     await generate_leaderboard(update, context, chat_id, "all")
 
 async def generate_leaderboard(update: Update, context: ContextTypes.DEFAULT_TYPE, chat_id: int, period: str) -> None:
-    # Filter messages by period
     now = datetime.now()
     if period == "today":
         start_time = now.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -110,16 +143,19 @@ async def generate_leaderboard(update: Update, context: ContextTypes.DEFAULT_TYP
         end_time = start_time + timedelta(days=1)
     elif period == "month":
         start_time = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    else:  # all
+    else:
         start_time = datetime(1970, 1, 1)
 
-    # Get top 10 users
     users = []
     total_msgs = 0
+    active_count = 0
     chat_id_str = str(chat_id)
     if chat_id_str not in message_counts:
         await update.message.reply_text("No stats yet! Start chatting!")
         return
+    
+    admins = await context.bot.get_chat_administrators(chat_id)
+    admin_count = len(admins)
     
     for user_id, data in message_counts[chat_id_str].items():
         try:
@@ -135,11 +171,13 @@ async def generate_leaderboard(update: Update, context: ContextTypes.DEFAULT_TYP
                     count for date, count in data["daily"].items()
                     if date >= start_time.date()
                 )
-            else:  # all
+            else:
                 count = data["monthly"]
-            if count > 0:  # Only include users with messages
+            if count > 0:
                 users.append((username, link, count))
                 total_msgs += count
+            if data["last_seen"] and (now - data["last_seen"]) <= timedelta(hours=24):
+                active_count += 1
         except Exception as e:
             logger.error(f"Error fetching user {user_id}: {e}")
     
@@ -149,28 +187,33 @@ async def generate_leaderboard(update: Update, context: ContextTypes.DEFAULT_TYP
     
     users = sorted(users, key=lambda x: x[2], reverse=True)[:10]
 
-    # Generate image (Modified section)
-    img = Image.new('RGB', (1000, 800), color=(44, 47, 51))  # Larger image size
+    img = Image.new('RGB', (1000, 800), color=(44, 47, 51))
     draw = ImageDraw.Draw(img)
+    for y in range(800):
+        r = int(44 + (147 - 44) * (y / 800))
+        g = int(47 + (112 - 47) * (y / 800))
+        b = int(51 + (191 - 51) * (y / 800))
+        draw.line([(0, y), (1000, y)], fill=(r, g, b))
+    
     try:
-        font = ImageFont.truetype("DejaVuSans.ttf", 30)  # Bigger font size, assumes font in root
+        font = ImageFont.truetype("DejaVuSans.ttf", 30)
     except:
-        font = ImageFont.load_default()  # Fallback if font not found
+        font = ImageFont.load_default()
 
-    draw.text((20, 20), f"📈 LEADERBOARD ({period.capitalize()})", font=font, fill=(255, 215, 0))  # Gold title
+    draw.text((20, 20), f"📈 LEADERBOARD ({period.capitalize()})", font=font, fill=(255, 215, 0))
     y = 80
     for i, (username, link, count) in enumerate(users, 1):
-        emoji = "👤" if i > 2 else "👦🏻" if i == 2 else "👤"
+        emoji = "🥇" if i == 1 else "🥈" if i == 2 else "🥉" if i == 3 else "👤"
         text = f"{i}. {emoji} {username} ({link or 'No link'}) • {count}"
         draw.text((20, y), text, font=font, fill=(255, 255, 255))
         y += 40
     
-    draw.text((20, y + 20), f"✉️ Total messages: {total_msgs}", font=font, fill=(255, 255, 255))
+    draw.text((20, y + 20), f"✉️ Total Messages: {total_msgs}", font=font, fill=(0, 255, 0))
+    draw.text((20, y + 60), f"🌟 Active Users (24h): {active_count}", font=font, fill=(0, 191, 255))
+    draw.text((20, y + 100), f"👑 Admins: {admin_count}", font=font, fill=(255, 105, 180))
 
-    # Save image
     img.save("leaderboard.png")
 
-    # Buttons
     keyboard = [
         [InlineKeyboardButton("Today", callback_data=f"stat_today_{chat_id}"),
          InlineKeyboardButton("Yesterday", callback_data=f"stat_yesterday_{chat_id}"),
@@ -178,7 +221,6 @@ async def generate_leaderboard(update: Update, context: ContextTypes.DEFAULT_TYP
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    # Send image
     with open("leaderboard.png", "rb") as photo:
         await context.bot.send_photo(chat_id=chat_id, photo=photo, reply_markup=reply_markup)
 
@@ -216,7 +258,7 @@ async def kick_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     
     try:
         await chat.ban_member(target.id)
-        await chat.unban_member(target.id)  # Ban then unban = kick
+        await chat.unban_member(target.id)
         await message.reply_text(f"{target.first_name} got the boot! See ya! 👢")
     except TelegramError as e:
         await message.reply_text(f"Couldn’t kick {target.first_name}: {e}")
@@ -295,7 +337,7 @@ async def members_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     
     admins = await chat.get_administrators()
     bot_member = await chat.get_member(context.bot.id)
-    if not bot_member.can_restrict_members:  # Using as a proxy for general perms
+    if not bot_member.can_restrict_members:
         keyboard = [[InlineKeyboardButton("Grant Permissions", url=f"https://t.me/{context.bot.username}?start=permissions_{chat.id}")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await message.reply_text("I need an admin post to do these things!", reply_markup=reply_markup)
