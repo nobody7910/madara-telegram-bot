@@ -17,10 +17,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         f"👋 Yo yo, {user.first_name} ( [{user.first_name}]({user_link}) )! Welcome aboard! 👋\n"
         f"I’m *Mᴀᴅᴀʀᴀ⚡Cʜᴀᴛ🌀*, your ultimate group companion! 🔥\n"
         f"Ready to spice up your chats with stats, fun, and moderation? 🎉\n"
-        f"Track your group’s vibe with /stat—leaderboards and more! 📊\n"
-        f"Drop some anime love with /waifus, /hug, or /bonk! 😎\n"
-        f"Need to chill? Mark /afk and I’ll cover you! 😴\n"
-        f"Admins, flex with /mute, /kick, or /warn—keep it tight! 💪\n"
         f"Hit the buttons below to get started or get help! 🚀\n"
         f"Add me to your squad and let’s make it legendary! 🌟\n"
         f"Questions? Support’s got your back—tap below! ☘️"
@@ -28,8 +24,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     
     keyboard = [
         [InlineKeyboardButton("➕ Add me to group", url="https://t.me/Madara7_chat_bot?startgroup=true")],
-        [InlineKeyboardButton("ℹ️ Help", callback_data="help_start"),
-         InlineKeyboardButton("📞 Support", url="https://t.me/+rh41IlhjtHVjZWY1")]
+        [InlineKeyboardButton("ℹ️ info", url="https://t.me/Sung_jin_woo_79"),
+        InlineKeyboardButton("📞 Support", url="https://t.me/+rh41IlhjtHVjZWY1")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
