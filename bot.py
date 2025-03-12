@@ -1,4 +1,3 @@
-# bot.py
 import logging
 from telegram import Update
 from telegram.ext import (
@@ -17,7 +16,7 @@ from handlers.group import (
     stat_command, info_command, mute_command, unmute_command, top_command,
     active_command, track_messages, leaderboard_command, handle_stat_callback,
     members_command, rank_command, warn_command, kick_command, afk_command,
-    welcome_new_member, cancel_command
+    welcome_new_member, cancel_command, ban_command
 )
 from handlers.fun import register_fun_handlers
 
@@ -67,6 +66,7 @@ def register_handlers(application):
     application.add_handler(CommandHandler("kick", lambda u, c: check_admin(u, c, kick_command)))
     application.add_handler(CommandHandler("members", lambda u, c: check_admin(u, c, members_command)))
     application.add_handler(CommandHandler("cancel", cancel_command))
+    application.add_handler(CommandHandler("ban", lambda u, c: check_admin(u, c, ban_command)))  # Added ban command
 
     # Message tracking, welcome, and callbacks
     application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome_new_member))  # Added for welcome
