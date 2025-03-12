@@ -7,7 +7,7 @@ from telegram.ext import (
     MessageHandler,
     filters,
     CallbackQueryHandler,
-    ContextTypes  # Fixed this
+    ContextTypes
 )
 from config import BOT_TOKEN
 from handlers.general_commands import start, help_command
@@ -16,9 +16,10 @@ from handlers.user_info import get_user_info
 from handlers.group import (
     stat_command, info_command, mute_command, unmute_command, top_command,
     active_command, track_messages, leaderboard_command, handle_stat_callback,
-    members_command, rank_command, warn_command, kick_command, afk_command
+    members_command, rank_command, warn_command, kick_command, afk_command,
+    welcome_new_member, cancel_command
 )
-from handlers.fun import register_fun_handlers  # New fun commands handler
+from handlers.fun import register_fun_handlers
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -32,7 +33,7 @@ def register_handlers(application):
     application.add_handler(CommandHandler("start", start, filters=filters.ChatType.PRIVATE))
     application.add_handler(CommandHandler("start", start, filters=filters.ChatType.GROUPS))
     application.add_handler(CommandHandler("help", help_command))
-    application.add_handler(CommandHandler("photo", get_user_info))  # Renamed from user_info for consistency
+    application.add_handler(CommandHandler("photo", get_user_info))
     application.add_handler(CommandHandler("info", info_command))
     application.add_handler(CommandHandler("stat", stat_command))
     application.add_handler(CommandHandler("top", top_command))
@@ -65,8 +66,10 @@ def register_handlers(application):
     application.add_handler(CommandHandler("warn", lambda u, c: check_admin(u, c, warn_command)))
     application.add_handler(CommandHandler("kick", lambda u, c: check_admin(u, c, kick_command)))
     application.add_handler(CommandHandler("members", lambda u, c: check_admin(u, c, members_command)))
+    application.add_handler(CommandHandler("cancel", cancel_command))
 
-    # Message tracking and callbacks
+    # Message tracking, welcome, and callbacks
+    application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome_new_member))  # Added for welcome
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, track_messages))
     application.add_handler(CallbackQueryHandler(handle_stat_callback, pattern=r'^stat_'))
     application.add_handler(CallbackQueryHandler(help_command, pattern=r'^(help_|fun_)'))

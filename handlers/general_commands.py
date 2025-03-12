@@ -3,6 +3,7 @@ import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from handlers.group import chat_data, message_counts
+from handlers.fun import FUN_COMMANDS  # Assuming FUN_COMMANDS is imported from fun.py
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +26,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     keyboard = [
         [InlineKeyboardButton("➕ Add me to group", url="https://t.me/Madara7_chat_bot?startgroup=true")],
         [InlineKeyboardButton("ℹ️ info", url="https://t.me/Sung_jin_woo_79"),
-        InlineKeyboardButton("📞 Support", url="https://t.me/+rh41IlhjtHVjZWY1")]
+         InlineKeyboardButton("📞 Support", url="https://t.me/+rh41IlhjtHVjZWY1")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
@@ -62,15 +63,16 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             [InlineKeyboardButton("🥇 Rank", callback_data="help_rank"),
              InlineKeyboardButton("⚠️ Warn", callback_data="help_warn")],
             [InlineKeyboardButton("👢 Kick", callback_data="help_kick"),
-             InlineKeyboardButton("😴 AFK", callback_data="help_afk")],
-            [InlineKeyboardButton("🎉 Fun", callback_data="help_fun"),
-             InlineKeyboardButton("❌ Close", callback_data="help_close")]
+             InlineKeyboardButton("🚫 Ban", callback_data="help_ban")],  # Added Ban
+            [InlineKeyboardButton("😴 AFK", callback_data="help_afk"),
+             InlineKeyboardButton("🎉 Fun", callback_data="help_fun")],
+            [InlineKeyboardButton("❌ Close", callback_data="help_close")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         help_text = (
             "Yo! I’m your slick bot! 😎\n"
             "Tap a button to see what I can do!\n\n"
-            "Commands: /help, /info, /photo, /stat, /members, /top, /mute, /unmute, /active, /rank, /warn, /kick, /afk, /waifus..."
+            "Commands: /help, /info, /photo, /stat, /members, /top, /mute, /unmute, /active, /rank, /warn, /kick, /ban, /afk, /waifus..."
         )
         if query:
             await query.edit_message_text(text=help_text, reply_markup=reply_markup)
@@ -90,19 +92,25 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             "help_stat": "📊 /stat - Leaderboard with top chatters!",
             "help_members": "👥 /members - Tags all members (admin only)!",
             "help_top": "🏆 /top - Top 3 chatterboxes!",
-            "help_mute": "🔇 /mute - Mutes a user (admin only)!",
-            "help_unmute": "🔊 /unmute - Unmutes a user (admin only)!",
+            "help_mute": "🔇 /mute - Mutes a user (admin only) via reply or /mute @username!",
+            "help_unmute": "🔊 /unmute - Unmutes a user (admin only) via reply or /unmute @username!",
             "help_active": "🌟 /active - Counts active users!",
             "help_rank": "🥇 /rank - Top 5 message senders!",
-            "help_warn": "⚠️ /warn - Warns a user (admin only)!",
-            "help_kick": "👢 /kick - Kicks a user (admin only)!",
+            "help_warn": "⚠️ /warn - Warns a user (admin only) via reply or /warn @username!",
+            "help_kick": "👢 /kick - Kicks a user (admin only) via reply or /kick @username!",
+            "help_ban": (
+                "🚫 **BAN HAMMER ALERT!** 🚫\n"
+                "🔒 /ban - Ban a user (admin only) via reply or /ban @username!\n"
+                "🎉 Example: Banished [{user}](link) from *group*! 👋\n"
+                "🌟 Keeps the group safe and epic! 🔥"
+            ),
             "help_afk": "😴 /afk - Mark yourself AFK with a custom message!"
         }
         if data in summaries:
             back_button = [[InlineKeyboardButton("⬅️ Back", callback_data="help_back"),
                             InlineKeyboardButton("❌ Close", callback_data="help_close")]]
             reply_markup = InlineKeyboardMarkup(back_button)
-            await query.edit_message_text(summaries[data], reply_markup=reply_markup)
+            await query.edit_message_text(summaries[data], reply_markup=reply_markup, parse_mode="Markdown")
             await query.answer()
         elif data == "help_fun":
             fun_keyboard = [[InlineKeyboardButton(f"/{cmd}", callback_data=f"fun_{cmd}")] for cmd in FUN_COMMANDS.keys()]

@@ -8,6 +8,7 @@ from telegram.error import Forbidden, TelegramError
 from collections import defaultdict
 from PIL import Image, ImageDraw, ImageFont
 import os
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -15,6 +16,7 @@ message_counts = {}
 chat_data = {}
 warnings = {}
 afk_users = defaultdict(lambda: {"time": None, "message": None})
+tagging_operations = {}  # Global for tracking tagging operations
 
 async def track_messages(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat = update.effective_chat
@@ -187,29 +189,26 @@ async def generate_leaderboard(update: Update, context: ContextTypes.DEFAULT_TYP
     
     users = sorted(users, key=lambda x: x[2], reverse=True)[:10]
 
-    # Generate Image (Mimicking Your Example)
-    img = Image.new('RGB', (1000, 600), color=(30, 30, 30))  # Dark background like your example
+    # Generate Image
+    img = Image.new('RGB', (1000, 600), color=(30, 30, 30))
     draw = ImageDraw.Draw(img)
     
-    # Add decorative circles (simplified)
-    draw.ellipse((50, 50, 150, 150), fill=(139, 0, 0, 50))  # Faint red circle
+    draw.ellipse((50, 50, 150, 150), fill=(139, 0, 0, 50))
     draw.ellipse((850, 450, 950, 550), fill=(139, 0, 0, 50))
     
     try:
-        font_title = ImageFont.truetype("DejaVuSans.ttf", 60)  # Big title like your example
-        font_text = ImageFont.truetype("DejaVuSans.ttf", 30)   # Text for names/counts
+        font_title = ImageFont.truetype("DejaVuSans.ttf", 60)
+        font_text = ImageFont.truetype("DejaVuSans.ttf", 30)
     except:
         font_title = ImageFont.load_default()
         font_text = ImageFont.load_default()
 
-    # Title
     draw.text((400, 20), "LEADERBOARD".upper(), font=font_title, fill=(255, 255, 255))
 
-    # Draw bars and text
     bar_height = 40
     y_start = 100
     max_count = max(users, key=lambda x: x[2])[2]
-    bar_color = (255, 99, 71)  # Tomato red like your example
+    bar_color = (255, 99, 71)
 
     for i, (username, link, count) in enumerate(users, 1):
         bar_width = int((count / max_count) * 800) if max_count > 0 else 0
@@ -219,7 +218,6 @@ async def generate_leaderboard(update: Update, context: ContextTypes.DEFAULT_TYP
 
     img.save("leaderboard.png")
 
-    # Prepare Caption (Text Stats)
     caption = f"*📈 {period.capitalize()} Leaderboard 📈*\n\n"
     caption += "🏆 *Top Chatters:*\n"
     for i, (username, link, count) in enumerate(users, 1):
@@ -227,7 +225,6 @@ async def generate_leaderboard(update: Update, context: ContextTypes.DEFAULT_TYP
         caption += f"{i}. {emoji} [{username}]({link or 'tg://user?id=' + str(user_id)}) • {count} msgs\n"
     caption += f"\n✉️ *Total Messages:* {total_msgs}"
 
-    # Buttons
     keyboard = [
         [InlineKeyboardButton("Today", callback_data=f"stat_today_{chat_id}"),
          InlineKeyboardButton("Yesterday", callback_data=f"stat_yesterday_{chat_id}"),
@@ -235,7 +232,6 @@ async def generate_leaderboard(update: Update, context: ContextTypes.DEFAULT_TYP
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    # Send Image with Caption and Buttons
     with open("leaderboard.png", "rb") as photo:
         await context.bot.send_photo(
             chat_id=chat_id,
@@ -266,11 +262,21 @@ async def kick_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         await message.reply_text("Only admins can kick people, bro! 😛")
         return
     
-    if not message.reply_to_message:
-        await message.reply_text("Reply to someone to kick them!")
+    target = None
+    if message.reply_to_message:
+        target = message.reply_to_message.from_user
+    elif context.args and re.match(r'^@[\w]+$', context.args[0]):
+        username = context.args[0][1:]  # Remove the @ symbol
+        try:
+            target = await context.bot.get_chat_member(chat.id, username).user
+        except TelegramError:
+            await message.reply_text(f"Couldn’t find {context.args[0]} in this group!")
+            return
+    
+    if not target:
+        await message.reply_text("Reply to someone or use /kick @username to kick them!")
         return
     
-    target = message.reply_to_message.from_user
     if target.id in [admin.user.id for admin in admins]:
         await message.reply_text(
             f"Yo {user.first_name}, kicking an admin like {target.first_name}? That’s a no-go! 😂"
@@ -280,7 +286,7 @@ async def kick_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     try:
         await chat.ban_member(target.id)
         await chat.unban_member(target.id)
-        await message.reply_text(f"{target.first_name} got the boot! See ya! 👢")
+        await message.reply_text(f"👢 {target.first_name} got the boot! See ya! 👋")
     except TelegramError as e:
         await message.reply_text(f"Couldn’t kick {target.first_name}: {e}")
 
@@ -305,18 +311,28 @@ async def mute_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         await message.reply_text("Only admins can mute people, punk! 😛")
         return
     
-    if not message.reply_to_message:
-        await message.reply_text("Reply to someone to mute them, genius!")
+    target = None
+    if message.reply_to_message:
+        target = message.reply_to_message.from_user
+    elif context.args and re.match(r'^@[\w]+$', context.args[0]):
+        username = context.args[0][1:]  # Remove the @ symbol
+        try:
+            target = await context.bot.get_chat_member(chat.id, username).user
+        except TelegramError:
+            await message.reply_text(f"Couldn’t find {context.args[0]} in this group!")
+            return
+    
+    if not target:
+        await message.reply_text("Reply to someone or use /mute @username to mute them, genius!")
         return
     
-    target = message.reply_to_message.from_user
     if target.id in [admin.user.id for admin in admins]:
         await message.reply_text(
             f"Hey {user.first_name}, you stupid? You think I’m gonna mute an admin like {target.first_name}? 😂"
         )
     else:
         await chat.restrict_member(target.id, permissions={"can_send_messages": False})
-        await message.reply_text(f"{target.first_name} has been muted! Silence is golden! 🤫")
+        await message.reply_text(f"🔇 {target.first_name} has been muted! Silence is golden! 🤫")
 
 async def unmute_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat = update.effective_chat
@@ -339,55 +355,23 @@ async def unmute_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await message.reply_text("Only admins can unmute, buddy! 😛")
         return
     
-    if not message.reply_to_message:
-        await message.reply_text("Reply to someone to unmute them!")
-        return
-    
-    target = message.reply_to_message.from_user
-    await chat.restrict_member(target.id, permissions={"can_send_messages": True})
-    await message.reply_text(f"{target.first_name} is free from the mute dungeon! Speak up, champ! 🎉")
-
-async def members_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    chat = update.effective_chat
-    message = update.effective_message
-    user = message.from_user
-    
-    if chat.type not in ["group", "supergroup"]:
-        await message.reply_text("Yo, this command is for groups only! Try it there! 😉")
-        return
-    
-    admins = await chat.get_administrators()
-    bot_member = await chat.get_member(context.bot.id)
-    if not bot_member.can_restrict_members:
-        keyboard = [[InlineKeyboardButton("Grant Permissions", url=f"https://t.me/{context.bot.username}?start=permissions_{chat.id}")]]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await message.reply_text("I need an admin post to do these things!", reply_markup=reply_markup)
-        return
-    
-    if user.id not in [admin.user.id for admin in admins]:
-        await message.reply_text("Only admins can summon the crew with /members! 😛")
-        return
-    
-    custom_msg = " ".join(context.args) if context.args else "Yo, assemble!"
-    await message.reply_text(f"📢 Tagging all members! {custom_msg} 🔔")
-    
-    try:
-        members = await chat.get_members()
-        member_list = [m.user for m in members if not m.user.is_bot]
-        if not member_list:
-            await message.reply_text("No members to tag? This group’s a ghost town! 👻")
+    target = None
+    if message.reply_to_message:
+        target = message.reply_to_message.from_user
+    elif context.args and re.match(r'^@[\w]+$', context.args[0]):
+        username = context.args[0][1:]  # Remove the @ symbol
+        try:
+            target = await context.bot.get_chat_member(chat.id, username).user
+        except TelegramError:
+            await message.reply_text(f"Couldn’t find {context.args[0]} in this group!")
             return
-        
-        for i in range(0, len(member_list), 8):
-            batch = member_list[i:i+8]
-            tags = " ".join(f"@{m.username}" if m.username else m.first_name for m in batch)
-            await context.bot.send_message(chat_id=chat.id, text=f"{custom_msg} {tags}")
-            if i + 8 < len(member_list):
-                time.sleep(2)
-    except Forbidden:
-        await message.reply_text("Can’t tag some folks—check my permissions!")
-    except TelegramError as e:
-        await message.reply_text(f"Oops, something went wrong: {e}")
+    
+    if not target:
+        await message.reply_text("Reply to someone or use /unmute @username to unmute them!")
+        return
+    
+    await chat.restrict_member(target.id, permissions={"can_send_messages": True})
+    await message.reply_text(f"🔊 {target.first_name} is free from the mute dungeon! Speak up, champ! 🎉")
 
 async def warn_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat = update.effective_chat
@@ -410,11 +394,21 @@ async def warn_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         await message.reply_text("Only admins can warn people, dude! 😛")
         return
     
-    if not message.reply_to_message:
-        await message.reply_text("Reply to someone to warn them!")
+    target = None
+    if message.reply_to_message:
+        target = message.reply_to_message.from_user
+    elif context.args and re.match(r'^@[\w]+$', context.args[0]):
+        username = context.args[0][1:]  # Remove the @ symbol
+        try:
+            target = await context.bot.get_chat_member(chat.id, username).user
+        except TelegramError:
+            await message.reply_text(f"Couldn’t find {context.args[0]} in this group!")
+            return
+    
+    if not target:
+        await message.reply_text("Reply to someone or use /warn @username to warn them!")
         return
     
-    target = message.reply_to_message.from_user
     if target.id in [admin.user.id for admin in admins]:
         await message.reply_text(
             f"Yo {user.first_name}, warning an admin like {target.first_name}? Nah, that’s a bold move I won’t touch! 😂"
@@ -434,13 +428,165 @@ async def warn_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     if warn_count >= 3:
         try:
             await chat.ban_member(target.id)
-            await message.reply_text(f"{target.first_name} hit 3 warnings—bam, banned! 👋")
+            await message.reply_text(f"⚠️ {target.first_name} hit 3 warnings—bam, banned! 👋")
             del warnings[chat_id][user_id]
         except TelegramError as e:
             await message.reply_text(f"Couldn’t ban {target.first_name}: {e}")
     else:
         await message.reply_text(
             f"⚠️ {target.first_name}, you’ve been warned! {warn_count}/3 strikes—shape up or ship out!"
+        )
+
+async def ban_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    chat = update.effective_chat
+    message = update.effective_message
+    user = message.from_user
+    
+    if chat.type not in ["group", "supergroup"]:
+        await message.reply_text("This command works only in groups!")
+        return
+    
+    admins = await chat.get_administrators()
+    bot_member = await chat.get_member(context.bot.id)
+    if not bot_member.can_restrict_members:
+        keyboard = [[InlineKeyboardButton("Grant Permissions", url=f"https://t.me/{context.bot.username}?start=permissions_{chat.id}")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await message.reply_text("I need an admin post to do these things!", reply_markup=reply_markup)
+        return
+    
+    if user.id not in [admin.user.id for admin in admins]:
+        await message.reply_text("Only admins can ban people, bro! 😛")
+        return
+    
+    target = None
+    if message.reply_to_message:
+        target = message.reply_to_message.from_user
+    elif context.args and re.match(r'^@[\w]+$', context.args[0]):
+        username = context.args[0][1:]  # Remove the @ symbol
+        try:
+            target = await context.bot.get_chat_member(chat.id, username).user
+        except TelegramError:
+            await message.reply_text(f"Couldn’t find {context.args[0]} in this group!")
+            return
+    
+    if not target:
+        await message.reply_text("Reply to someone or use /ban @username to ban them!")
+        return
+    
+    if target.id in [admin.user.id for admin in admins]:
+        await message.reply_text(
+            f"Yo {user.first_name}, banning an admin like {target.first_name}? That’s a no-go! 😂"
+        )
+        return
+    
+    target_link = f"https://t.me/{target.username}" if target.username else f"tg://user?id={target.id}"
+    try:
+        await chat.ban_member(target.id)
+        await message.reply_text(
+            f"🚫 **BAN HAMMER DROPPED!** 🚫\n"
+            f"The notorious [{target.first_name}]({target_link}) has been banished from *{chat.title}*!\n"
+            f"👉 Farewell, troublemaker! 👋\n"
+            f"🎉 Group is safe again! 🌟"
+            , parse_mode="Markdown"
+        )
+    except TelegramError as e:
+        await message.reply_text(f"Couldn’t ban {target.first_name}: {e}")
+
+async def members_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    chat = update.effective_chat
+    message = update.effective_message
+    user = message.from_user
+    
+    if chat.type not in ["group", "supergroup"]:
+        await message.reply_text("Yo, this command is for groups only! Try it there! 😉")
+        return
+    
+    admins = await chat.get_administrators()
+    bot_member = await chat.get_member(context.bot.id)
+    if not bot_member.can_restrict_members:
+        keyboard = [[InlineKeyboardButton("Grant Permissions", url=f"https://t.me/{context.bot.username}?start=permissions_{chat.id}")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await message.reply_text("I need an admin post to do these things!", reply_markup=reply_markup)
+        return
+    
+    if user.id not in [admin.user.id for admin in admins]:
+        await message.reply_text("Only admins can summon the crew with /members! 😛")
+        return
+    
+    custom_msg = " ".join(context.args) if context.args else "hey"
+    user_link = f"https://t.me/{user.username}" if user.username else f"tg://user?id={user.id}"
+    init_message = (
+        f"Tag Operation is started by [{user.first_name}]({user_link}). "
+        f"You can use /cancel@Madara7_chat_bot Command to Cancel the process. "
+        f"Have a nice chat!"
+    )
+    await message.reply_text(init_message, parse_mode="Markdown")
+    
+    chat_id = str(chat.id)
+    tagging_operations[chat_id] = True
+    
+    try:
+        member_count = await context.bot.get_chat_member_count(chat.id)
+        if member_count == 0:
+            await message.reply_text("No members to tag? This group’s a ghost town! 👻")
+            del tagging_operations[chat_id]
+            return
+        
+        # Use message_counts to tag active users (workaround)
+        if chat_id in message_counts:
+            active_users = [(uid, data) for uid, data in message_counts[chat_id].items() if data["monthly"] > 0]
+            member_list = []
+            for user_id, _ in active_users[:50]:  # Limit to 50 for testing
+                try:
+                    member = await context.bot.get_chat_member(chat.id, int(user_id))
+                    member_list.append(member.user)
+                except TelegramError:
+                    continue
+            
+            if not member_list:
+                await message.reply_text("No active members to tag! Start chatting! 👻")
+                del tagging_operations[chat_id]
+                return
+            
+            for i in range(0, len(member_list), 8):
+                batch = member_list[i:i+8]
+                batch_tags = ", ".join(f"[{m.first_name}](https://t.me/{m.username if m.username else ''} or tg://user?id={m.id})" for m in batch)
+                await context.bot.send_message(chat_id=chat.id, text=f"{custom_msg} {batch_tags}", parse_mode="Markdown")
+                if i + 8 < len(member_list) and chat_id in tagging_operations:
+                    time.sleep(2)
+                else:
+                    break
+        else:
+            await message.reply_text("No activity data yet! Chat more to enable tagging! 👻")
+    except Forbidden:
+        await message.reply_text("Can’t tag some folks—check my permissions!")
+    except TelegramError as e:
+        await message.reply_text(f"Oops, something went wrong: {e}")
+    finally:
+        if chat_id in tagging_operations:
+            del tagging_operations[chat_id]
+
+async def cancel_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    chat = update.effective_chat
+    message = update.effective_message
+    user = message.from_user
+    
+    if chat.type not in ["group", "supergroup"]:
+        await message.reply_text("This command works only in groups!")
+        return
+    
+    chat_id = str(chat.id)
+    user_link = f"https://t.me/{user.username}" if user.username else f"tg://user?id={user.id}"
+    
+    if chat_id in tagging_operations and tagging_operations[chat_id]:
+        del tagging_operations[chat_id]
+        await message.reply_text(
+            f"[{user.first_name}]({user_link}) The operation is stopped... Enjoy the peace!",
+            parse_mode="Markdown"
+        )
+    else:
+        await message.reply_text(
+            f"{user.first_name} There is no operation to be paused right now. 🙄"
         )
 
 async def rank_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
