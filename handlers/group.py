@@ -62,12 +62,15 @@ async def welcome_new_member(update: Update, context: ContextTypes.DEFAULT_TYPE)
     new_members = update.message.new_chat_members
     for member in new_members:
         photos = await context.bot.get_user_profile_photos(member.id, limit=1)
-        member_link = f"https://t.me/{member.username}" if member.username else f"tg://user?id={member.id}"
+        member_link = f"tg://user?id={member.id}"  # Use a simple user ID link to avoid issues
+        # Escape special characters in first_name to prevent Markdown issues
+        first_name_safe = member.first_name.replace("[", "\\[").replace("]", "\\]")
+        username_safe = member.username if member.username else "N/A"
         welcome_text = (
-            f"🎉 Woohoo! A wild {member.first_name} has joined the party! 🎉\n"
+            f"🎉 Woohoo! A wild {first_name_safe} has joined the party! 🎉\n"
             f"Get ready for some epic vibes in *{chat.title}*! 🌟\n\n"
-            f"👤 Name: [{member.first_name}]({member_link})\n"
-            f"📛 Username: @{member.username if member.username else 'N/A'}\n"
+            f"👤 Name: [{first_name_safe}]({member_link})\n"
+            f"📛 Username: @{username_safe}\n"
             f"🆔 ID: {member.id}\n"
             f"Let’s make it legendary—follow the rules and enjoy! ☘️"
         )
@@ -86,8 +89,8 @@ async def welcome_new_member(update: Update, context: ContextTypes.DEFAULT_TYPE)
             await context.bot.send_message(
                 chat_id=chat.id,
                 text=welcome_text,
-                reply_markup=reply_markup,
-                parse_mode="Markdown"
+                parse_mode="Markdown",
+                reply_markup=reply_markup
             )
 
 async def info_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -268,7 +271,7 @@ async def kick_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     elif context.args and re.match(r'^@[\w]+$', context.args[0]):
         username = context.args[0][1:]  # Remove the @ symbol
         try:
-            target = await context.bot.get_chat_member(chat.id, username).user
+            target = (await context.bot.get_chat_member(chat.id, username)).user
         except TelegramError:
             await message.reply_text(f"Couldn’t find {context.args[0]} in this group!")
             return
@@ -317,7 +320,7 @@ async def mute_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     elif context.args and re.match(r'^@[\w]+$', context.args[0]):
         username = context.args[0][1:]  # Remove the @ symbol
         try:
-            target = await context.bot.get_chat_member(chat.id, username).user
+            target = (await context.bot.get_chat_member(chat.id, username)).user
         except TelegramError:
             await message.reply_text(f"Couldn’t find {context.args[0]} in this group!")
             return
@@ -361,7 +364,7 @@ async def unmute_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     elif context.args and re.match(r'^@[\w]+$', context.args[0]):
         username = context.args[0][1:]  # Remove the @ symbol
         try:
-            target = await context.bot.get_chat_member(chat.id, username).user
+            target = (await context.bot.get_chat_member(chat.id, username)).user
         except TelegramError:
             await message.reply_text(f"Couldn’t find {context.args[0]} in this group!")
             return
@@ -400,7 +403,7 @@ async def warn_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     elif context.args and re.match(r'^@[\w]+$', context.args[0]):
         username = context.args[0][1:]  # Remove the @ symbol
         try:
-            target = await context.bot.get_chat_member(chat.id, username).user
+            target = (await context.bot.get_chat_member(chat.id, username)).user
         except TelegramError:
             await message.reply_text(f"Couldn’t find {context.args[0]} in this group!")
             return
@@ -464,7 +467,8 @@ async def ban_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     elif context.args and re.match(r'^@[\w]+$', context.args[0]):
         username = context.args[0][1:]  # Remove the @ symbol
         try:
-            target = await context.bot.get_chat_member(chat.id, username).user
+            chat_member = await context.bot.get_chat_member(chat.id, username)  # Properly await the coroutine
+            target = chat_member.user  # Access .user after awaiting
         except TelegramError:
             await message.reply_text(f"Couldn’t find {context.args[0]} in this group!")
             return
