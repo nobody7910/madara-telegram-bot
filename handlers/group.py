@@ -365,42 +365,29 @@ async def mute_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 async def unmute_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat = update.effective_chat
-    message = update.effective_message
-    user = message.from_user
-    
+    user = update.effective_user
     if chat.type not in ["group", "supergroup"]:
-        await message.reply_text("This command works only in groups!")
+        await update.message.reply_text("This command only works in groups!")
         return
     
+    if not update.message.reply_to_message:
+        await update.message.reply_text("Reply to a user to unmute them!")
+        return
+    
+    target = update.message.reply_to_message.from_user
+    
+    # Check if target is an admin
     admins = await chat.get_administrators()
-    bot_member = await chat.get_member(context.bot.id)
-    if not bot_member.can_restrict_members:
-        keyboard = [[InlineKeyboardButton("Grant Permissions", url=f"https://t.me/{context.bot.username}?start=permissions_{chat.id}")]]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await message.reply_text("I need an admin post to do these things!", reply_markup=reply_markup)
+    if any(admin.user.id == target.id for admin in admins):
+        await update.message.reply_text(f"{target.first_name} is an admin—they’re already free to chat! 😛")
         return
     
-    if user.id not in [admin.user.id for admin in admins]:
-        await message.reply_text("Only admins can unmute, buddy! 😛")
-        return
-    
-    target = None
-    if message.reply_to_message:
-        target = message.reply_to_message.from_user
-    elif context.args and re.match(r'^@[\w]+$', context.args[0]):
-        username = context.args[0][1:]  # Remove the @ symbol
-        try:
-            target = (await context.bot.get_chat_member(chat.id, username)).user
-        except TelegramError:
-            await message.reply_text(f"Couldn’t find {context.args[0]} in this group!")
-            return
-    
-    if not target:
-        await message.reply_text("Reply to someone or use /unmute @username to unmute them!")
-        return
-    
-    await chat.restrict_member(target.id, permissions={"can_send_messages": True})
-    await message.reply_text(f"🔊 {target.first_name} is free from the mute dungeon! Speak up, champ! 🎉")
+    try:
+        await chat.restrict_member(target.id, permissions={"can_send_messages": True})
+        await update.message.reply_text(f"{target.first_name} has been unmuted! 🗣️")
+    except TelegramError as e:
+        logger.error(f"Failed to unmute {target.id}: {e}")
+        await update.message.reply_text(f"Couldn’t unmute {target.first_name}. Error: {e.message}")
 
 async def warn_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat = update.effective_chat
