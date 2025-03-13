@@ -170,9 +170,12 @@ async def generate_leaderboard(update: Update, context: ContextTypes.DEFAULT_TYP
     
     # Fetch message counts from MongoDB
     chat_records = message_counts.find({'chat_id': chat_id_str})
-    chat_records_list = list(chat_records)  # Convert Cursor to list
-    if not chat_records_list:  # Check if list is empty
-        await update.message.reply_text("No stats yet! Start chatting!")
+    chat_records_list = list(chat_records)
+    if not chat_records_list:
+        if update.callback_query:
+            await update.callback_query.message.reply_text("No stats yet! Start chatting!")
+        else:
+            await update.message.reply_text("No stats yet! Start chatting!")
         return
     
     admins = await context.bot.get_chat_administrators(chat_id)
@@ -182,8 +185,8 @@ async def generate_leaderboard(update: Update, context: ContextTypes.DEFAULT_TYP
         user_id = record['user_id']
         try:
             user = await context.bot.get_chat_member(chat_id, int(user_id))
-            username = user.user.username or user.user.first_name
-            link = f"https://t.me/{user.user.username}" if user.user.username else ""
+            username = user.user.username or user.user.first_name  # Still needed for image
+            link = f"https://t.me/{user.user.username}" if user.user.username else ""  # Keep for fallback
             daily = record.get('daily', {})
             if period == "today":
                 count = daily.get(start_time.date().isoformat(), 0)
@@ -197,7 +200,7 @@ async def generate_leaderboard(update: Update, context: ContextTypes.DEFAULT_TYP
             else:
                 count = record.get('monthly', 0)
             if count > 0:
-                users.append((username, link, count))
+                users.append((username, link, count, user.user.first_name, user.user.id))  # Add first_name and id
                 total_msgs += count
             last_seen = record.get('last_seen')
             if last_seen and (now - datetime.fromisoformat(last_seen)) <= timedelta(hours=24):
@@ -206,12 +209,15 @@ async def generate_leaderboard(update: Update, context: ContextTypes.DEFAULT_TYP
             logger.error(f"Error fetching user {user_id}: {e}")
     
     if not users:
-        await update.message.reply_text(f"No messages found for {period}!")
+        if update.callback_query:
+            await update.callback_query.message.reply_text(f"No messages found for {period}!")
+        else:
+            await update.message.reply_text(f"No messages found for {period}!")
         return
     
     users = sorted(users, key=lambda x: x[2], reverse=True)[:10]
 
-    # Generate Image
+    # Generate Image (unchanged)
     img = Image.new('RGB', (1000, 600), color=(30, 30, 30))
     draw = ImageDraw.Draw(img)
     
@@ -232,7 +238,7 @@ async def generate_leaderboard(update: Update, context: ContextTypes.DEFAULT_TYP
     max_count = max(users, key=lambda x: x[2])[2]
     bar_color = (255, 99, 71)
 
-    for i, (username, link, count) in enumerate(users, 1):
+    for i, (username, link, count, first_name, user_id) in enumerate(users, 1):
         bar_width = int((count / max_count) * 800) if max_count > 0 else 0
         y = y_start + (i - 1) * (bar_height + 10)
         draw.rectangle([100, y, 100 + bar_width, y + bar_height], fill=bar_color)
@@ -240,11 +246,12 @@ async def generate_leaderboard(update: Update, context: ContextTypes.DEFAULT_TYP
 
     img.save("leaderboard.png")
 
+    # Updated Caption with First Name and tg://user?id= link
     caption = f"*📈 {period.capitalize()} Leaderboard 📈*\n\n"
     caption += "🏆 *Top Chatters:*\n"
-    for i, (username, link, count) in enumerate(users, 1):
-        emoji = "👦🏻" if i == 1 else "👤"
-        caption += f"{i}. {emoji} [{username}]({link or 'tg://user?id=' + str(user_id)}) • {count} msgs\n"
+    for i, (username, link, count, first_name, user_id) in enumerate(users, 1):
+        emoji = "👤" if i == 1 else "👤"
+        caption += f"{i}. {emoji} [{first_name}](tg://user?id={user_id}) • {count} msgs\n"
     caption += f"\n✉️ *Total Messages:* {total_msgs}"
 
     keyboard = [
