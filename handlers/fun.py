@@ -10,6 +10,9 @@ async def fetch_waifu_image(category: str) -> str:
     async with aiohttp.ClientSession() as session:
         async with session.get(f"https://api.waifu.pics/sfw/{category}") as resp:
             data = await resp.json()
+            if "url" not in data:
+                logger.error(f"Invalid category or API response for {category}: {data}")
+                return "https://via.placeholder.com/300"  # Fallback image if API fails
             return data["url"]
 
 async def generic_fun_command(update: Update, context: ContextTypes.DEFAULT_TYPE, category: str) -> None:
@@ -34,7 +37,7 @@ FUN_COMMANDS = {
     "kiss": "kiss", "lick": "lick", "pat": "pat", "smug": "smug", "bonk": "bonk",
     "yeet": "yeet", "blush": "blush", "smile": "smile", "wave": "wave",
     "highfive": "highfive", "handhold": "handhold", "nom": "nom", "bite": "bite",
-    "glomp": "glomp", "slap": "slap", "kill": "kill", "kick": "kick",
+    "glomp": "glomp", "slap": "slap", "kill": "kill", "kickk": "slap",  # Changed to "slap" as a valid category
     "happy": "happy", "wink": "wink", "poke": "poke", "dance": "dance", "cringe": "cringe"
 }
 

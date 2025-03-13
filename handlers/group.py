@@ -5,18 +5,20 @@ from datetime import datetime, timedelta
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CommandHandler, MessageHandler, filters
 from telegram.error import Forbidden, TelegramError
-from collections import defaultdict
 from PIL import Image, ImageDraw, ImageFont
 import os
 import re
+from utils.db import get_db
 
 logger = logging.getLogger(__name__)
 
-message_counts = {}
-chat_data = {}
-warnings = {}
-afk_users = defaultdict(lambda: {"time": None, "message": None})
-tagging_operations = {}  # Global for tracking tagging operations
+# Initialize MongoDB collections
+db = get_db()
+message_counts = db.get_collection('message_counts')
+chat_data = db.get_collection('chat_data')
+warnings = db.get_collection('warnings')
+afk_users = db.get_collection('afk_users')
+tagging_operations = {}  # Keep this in-memory for simplicity
 
 async def track_messages(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat = update.effective_chat
@@ -26,33 +28,43 @@ async def track_messages(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     
     chat_id = str(chat.id)
     user_id = str(user.id)
-    today = datetime.now().date()
+    today = datetime.now().date().isoformat()
     
-    if chat_id not in message_counts:
-        message_counts[chat_id] = {}
-    if user_id not in message_counts[chat_id]:
-        message_counts[chat_id][user_id] = {"daily": {}, "monthly": 0, "last_seen": None}
-    if today not in message_counts[chat_id][user_id]["daily"]:
-        message_counts[chat_id][user_id]["daily"][today] = 0
-    message_counts[chat_id][user_id]["daily"][today] += 1
-    message_counts[chat_id][user_id]["monthly"] += 1
-    message_counts[chat_id][user_id]["last_seen"] = datetime.now()
+    # Update message counts in MongoDB
+    message_counts.update_one(
+        {'chat_id': chat_id, 'user_id': user_id},
+        {
+            '$inc': {f'daily.{today}': 1, 'monthly': 1},
+            '$set': {'last_seen': datetime.now().isoformat()}
+        },
+        upsert=True
+    )
     
-    if chat_id not in chat_data:
-        chat_data[chat_id] = {
-            "title": chat.title,
-            "description": chat.description,
-            "member_count": await chat.get_member_count(),
-            "admins": [admin.user.id for admin in await chat.get_administrators()]
-        }
+    # Update chat data in MongoDB
+    admins = await chat.get_administrators()
+    chat_data.update_one(
+        {'chat_id': chat_id},
+        {
+            '$set': {
+                'title': chat.title,
+                'description': chat.description,
+                'member_count': await chat.get_member_count(),
+                'admins': [admin.user.id for admin in admins]
+            }
+        },
+        upsert=True
+    )
     
-    if (int(chat_id), int(user_id)) in afk_users:
-        afk_data = afk_users.pop((int(chat_id), int(user_id)))
-        duration = (datetime.now() - afk_data["time"]).total_seconds() // 60
+    # Check AFK status
+    afk_record = afk_users.find_one({'chat_id': chat_id, 'user_id': user_id})
+    if afk_record:
+        afk_time = datetime.fromisoformat(afk_record['time'])
+        duration = (datetime.now() - afk_time).total_seconds() // 60
         await update.message.reply_text(
             f"🎉 Welcome back, {user.first_name}! You were AFK for {duration} mins.\n"
-            f"Last AFK reason: {afk_data['message']}"
+            f"Last AFK reason: {afk_record['message']}"
         )
+        afk_users.delete_one({'chat_id': chat_id, 'user_id': user_id})
 
 async def welcome_new_member(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat = update.effective_chat
@@ -155,33 +167,39 @@ async def generate_leaderboard(update: Update, context: ContextTypes.DEFAULT_TYP
     total_msgs = 0
     active_count = 0
     chat_id_str = str(chat_id)
-    if chat_id_str not in message_counts:
+    
+    # Fetch message counts from MongoDB
+    chat_records = message_counts.find({'chat_id': chat_id_str})
+    if not chat_records or chat_records.count() == 0:
         await update.message.reply_text("No stats yet! Start chatting!")
         return
     
     admins = await context.bot.get_chat_administrators(chat_id)
     admin_count = len(admins)
     
-    for user_id, data in message_counts[chat_id_str].items():
+    for record in chat_records:
+        user_id = record['user_id']
         try:
             user = await context.bot.get_chat_member(chat_id, int(user_id))
             username = user.user.username or user.user.first_name
             link = f"https://t.me/{user.user.username}" if user.user.username else ""
+            daily = record.get('daily', {})
             if period == "today":
-                count = data["daily"].get(start_time.date(), 0)
+                count = daily.get(start_time.date().isoformat(), 0)
             elif period == "yesterday":
-                count = data["daily"].get(start_time.date(), 0)
+                count = daily.get(start_time.date().isoformat(), 0)
             elif period == "month":
                 count = sum(
-                    count for date, count in data["daily"].items()
-                    if date >= start_time.date()
+                    count for date, count in daily.items()
+                    if datetime.fromisoformat(date).date() >= start_time.date()
                 )
             else:
-                count = data["monthly"]
+                count = record.get('monthly', 0)
             if count > 0:
                 users.append((username, link, count))
                 total_msgs += count
-            if data["last_seen"] and (now - data["last_seen"]) <= timedelta(hours=24):
+            last_seen = record.get('last_seen')
+            if last_seen and (now - datetime.fromisoformat(last_seen)) <= timedelta(hours=24):
                 active_count += 1
         except Exception as e:
             logger.error(f"Error fetching user {user_id}: {e}")
@@ -420,19 +438,21 @@ async def warn_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     
     chat_id = str(chat.id)
     user_id = str(target.id)
-    if chat_id not in warnings:
-        warnings[chat_id] = {}
-    if user_id not in warnings[chat_id]:
-        warnings[chat_id][user_id] = 0
     
-    warnings[chat_id][user_id] += 1
-    warn_count = warnings[chat_id][user_id]
+    # Update warnings in MongoDB
+    warnings.update_one(
+        {'chat_id': chat_id, 'user_id': user_id},
+        {'$inc': {'count': 1}},
+        upsert=True
+    )
+    warn_record = warnings.find_one({'chat_id': chat_id, 'user_id': user_id})
+    warn_count = warn_record['count']
     
     if warn_count >= 3:
         try:
             await chat.ban_member(target.id)
             await message.reply_text(f"⚠️ {target.first_name} hit 3 warnings—bam, banned! 👋")
-            del warnings[chat_id][user_id]
+            warnings.delete_one({'chat_id': chat_id, 'user_id': user_id})
         except TelegramError as e:
             await message.reply_text(f"Couldn’t ban {target.first_name}: {e}")
     else:
@@ -467,8 +487,8 @@ async def ban_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     elif context.args and re.match(r'^@[\w]+$', context.args[0]):
         username = context.args[0][1:]  # Remove the @ symbol
         try:
-            chat_member = await context.bot.get_chat_member(chat.id, username)  # Properly await the coroutine
-            target = chat_member.user  # Access .user after awaiting
+            chat_member = await context.bot.get_chat_member(chat.id, username)
+            target = chat_member.user
         except TelegramError:
             await message.reply_text(f"Couldn’t find {context.args[0]} in this group!")
             return
@@ -536,32 +556,29 @@ async def members_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             del tagging_operations[chat_id]
             return
         
-        # Use message_counts to tag active users (workaround)
-        if chat_id in message_counts:
-            active_users = [(uid, data) for uid, data in message_counts[chat_id].items() if data["monthly"] > 0]
-            member_list = []
-            for user_id, _ in active_users[:50]:  # Limit to 50 for testing
-                try:
-                    member = await context.bot.get_chat_member(chat.id, int(user_id))
-                    member_list.append(member.user)
-                except TelegramError:
-                    continue
-            
-            if not member_list:
-                await message.reply_text("No active members to tag! Start chatting! 👻")
-                del tagging_operations[chat_id]
-                return
-            
-            for i in range(0, len(member_list), 8):
-                batch = member_list[i:i+8]
-                batch_tags = ", ".join(f"[{m.first_name}](https://t.me/{m.username if m.username else ''} or tg://user?id={m.id})" for m in batch)
-                await context.bot.send_message(chat_id=chat.id, text=f"{custom_msg} {batch_tags}", parse_mode="Markdown")
-                if i + 8 < len(member_list) and chat_id in tagging_operations:
-                    time.sleep(2)
-                else:
-                    break
-        else:
-            await message.reply_text("No activity data yet! Chat more to enable tagging! 👻")
+        # Use message_counts from MongoDB to tag active users
+        active_users = message_counts.find({'chat_id': chat_id, 'monthly': {'$gt': 0}})
+        member_list = []
+        for record in active_users.limit(50):  # Limit to 50 for testing
+            try:
+                member = await context.bot.get_chat_member(chat.id, int(record['user_id']))
+                member_list.append(member.user)
+            except TelegramError:
+                continue
+        
+        if not member_list:
+            await message.reply_text("No active members to tag! Start chatting! 👻")
+            del tagging_operations[chat_id]
+            return
+        
+        for i in range(0, len(member_list), 8):
+            batch = member_list[i:i+8]
+            batch_tags = ", ".join(f"[{m.first_name}](https://t.me/{m.username if m.username else ''} or tg://user?id={m.id})" for m in batch)
+            await context.bot.send_message(chat_id=chat.id, text=f"{custom_msg} {batch_tags}", parse_mode="Markdown")
+            if i + 8 < len(member_list) and chat_id in tagging_operations:
+                time.sleep(2)
+            else:
+                break
     except Forbidden:
         await message.reply_text("Can’t tag some folks—check my permissions!")
     except TelegramError as e:
@@ -600,18 +617,19 @@ async def rank_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         return
     
     chat_id = str(chat.id)
-    if chat_id not in message_counts or not message_counts[chat_id]:
+    ranked = message_counts.find({'chat_id': chat_id}).sort('monthly', -1).limit(5)
+    if not ranked or ranked.count() == 0:
         await update.message.reply_text("No chatter yet! Start talking to climb the ranks! 😛")
         return
     
-    ranked = sorted(message_counts[chat_id].items(), key=lambda x: x[1]["monthly"], reverse=True)[:5]
     rank_text = f"🏆 Top Chatterboxes in {chat.title} 🏆\n"
-    for i, (user_id, data) in enumerate(ranked, 1):
+    for i, record in enumerate(ranked, 1):
+        user_id = record['user_id']
         try:
             member = await chat.get_member(int(user_id))
-            rank_text += f"{i}. {member.user.full_name} - {data['monthly']} msgs\n"
+            rank_text += f"{i}. {member.user.full_name} - {record['monthly']} msgs\n"
         except TelegramError:
-            rank_text += f"{i}. User {user_id} - {data['monthly']} msgs (Gone?)\n"
+            rank_text += f"{i}. User {user_id} - {record['monthly']} msgs (Gone?)\n"
     await update.message.reply_text(rank_text)
 
 async def top_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -621,18 +639,19 @@ async def top_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         return
     
     chat_id = str(chat.id)
-    if chat_id not in message_counts or not message_counts[chat_id]:
+    ranked = message_counts.find({'chat_id': chat_id}).sort('monthly', -1).limit(3)
+    if not ranked or ranked.count() == 0:
         await update.message.reply_text("No top dogs yet! Chat more to claim the throne! 👑")
         return
     
-    ranked = sorted(message_counts[chat_id].items(), key=lambda x: x[1]["monthly"], reverse=True)[:3]
     top_text = f"👑 Top Dogs in {chat.title} 👑\n"
-    for i, (user_id, data) in enumerate(ranked, 1):
+    for i, record in enumerate(ranked, 1):
+        user_id = record['user_id']
         try:
             member = await chat.get_member(int(user_id))
-            top_text += f"{i}. {member.user.full_name} - {data['monthly']} msgs\n"
+            top_text += f"{i}. {member.user.full_name} - {record['monthly']} msgs\n"
         except TelegramError:
-            top_text += f"{i}. User {user_id} - {data['monthly']} msgs (Gone?)\n"
+            top_text += f"{i}. User {user_id} - {record['monthly']} msgs (Gone?)\n"
     await update.message.reply_text(top_text)
 
 async def active_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -642,20 +661,21 @@ async def active_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         return
     
     chat_id = str(chat.id)
-    if chat_id not in message_counts or not message_counts[chat_id]:
+    now = datetime.now()
+    active_users = message_counts.find({
+        'chat_id': chat_id,
+        'last_seen': {'$gte': (now - timedelta(hours=24)).isoformat()}
+    })
+    active_count = active_users.count()
+    chat_record = chat_data.find_one({'chat_id': chat_id})
+    if not chat_record:
         await update.message.reply_text("No activity yet! Get chatting! 😛")
         return
     
-    now = datetime.now()
-    active_users = [
-        (user_id, data) for user_id, data in message_counts[chat_id].items()
-        if data["last_seen"] and (now - data["last_seen"]) <= timedelta(hours=24)
-    ]
-    active_count = len(active_users)
     active_text = (
         f"🌟 Active Vibes in {chat.title} 🌟\n"
         f"Active Users (Last 24h): {active_count}\n"
-        f"Total Members: {chat_data[chat_id]['member_count']}\n"
+        f"Total Members: {chat_record['member_count']}\n"
         f"Get in on the action! 😎"
     )
     await update.message.reply_text(active_text)
@@ -678,11 +698,16 @@ async def afk_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         await update.message.reply_text("Yo, AFK only works in groups!")
         return
     
-    chat_id = chat.id
-    user_id = user.id
+    chat_id = str(chat.id)
+    user_id = str(user.id)
     afk_msg = " ".join(context.args) or "AFK - Be right back!"
     if update.message.reply_to_message:
         afk_msg = update.message.reply_to_message.text
     
-    afk_users[(chat_id, user_id)] = {"time": datetime.now(), "message": afk_msg}
+    # Update AFK status in MongoDB
+    afk_users.update_one(
+        {'chat_id': chat_id, 'user_id': user_id},
+        {'$set': {'time': datetime.now().isoformat(), 'message': afk_msg}},
+        upsert=True
+    )
     await update.message.reply_text(f"✨ {user.first_name} is now AFK! Reason: {afk_msg}")
