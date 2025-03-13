@@ -170,14 +170,15 @@ async def generate_leaderboard(update: Update, context: ContextTypes.DEFAULT_TYP
     
     # Fetch message counts from MongoDB
     chat_records = message_counts.find({'chat_id': chat_id_str})
-    if not chat_records or chat_records.count() == 0:
+    chat_records_list = list(chat_records)  # Convert Cursor to list
+    if not chat_records_list:  # Check if list is empty
         await update.message.reply_text("No stats yet! Start chatting!")
         return
     
     admins = await context.bot.get_chat_administrators(chat_id)
     admin_count = len(admins)
     
-    for record in chat_records:
+    for record in chat_records_list:
         user_id = record['user_id']
         try:
             user = await context.bot.get_chat_member(chat_id, int(user_id))
@@ -618,12 +619,13 @@ async def rank_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     
     chat_id = str(chat.id)
     ranked = message_counts.find({'chat_id': chat_id}).sort('monthly', -1).limit(5)
-    if not ranked or ranked.count() == 0:
+    ranked_list = list(ranked)  # Convert Cursor to list
+    if not ranked_list:  # Check if list is empty
         await update.message.reply_text("No chatter yet! Start talking to climb the ranks! 😛")
         return
     
     rank_text = f"🏆 Top Chatterboxes in {chat.title} 🏆\n"
-    for i, record in enumerate(ranked, 1):
+    for i, record in enumerate(ranked_list, 1):
         user_id = record['user_id']
         try:
             member = await chat.get_member(int(user_id))
@@ -640,12 +642,13 @@ async def top_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     
     chat_id = str(chat.id)
     ranked = message_counts.find({'chat_id': chat_id}).sort('monthly', -1).limit(3)
-    if not ranked or ranked.count() == 0:
+    ranked_list = list(ranked)  # Convert Cursor to list
+    if not ranked_list:  # Check if list is empty
         await update.message.reply_text("No top dogs yet! Chat more to claim the throne! 👑")
         return
     
-    top_text = f"👑 Top Dogs in {chat.title} 👑\n"
-    for i, record in enumerate(ranked, 1):
+    top_text = f"👑 Top monkeys in {chat.title} 👑\n"
+    for i, record in enumerate(ranked_list, 1):
         user_id = record['user_id']
         try:
             member = await chat.get_member(int(user_id))
@@ -666,7 +669,8 @@ async def active_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         'chat_id': chat_id,
         'last_seen': {'$gte': (now - timedelta(hours=24)).isoformat()}
     })
-    active_count = active_users.count()
+    active_users_list = list(active_users)  # Convert Cursor to list
+    active_count = len(active_users_list)  # Count the list length
     chat_record = chat_data.find_one({'chat_id': chat_id})
     if not chat_record:
         await update.message.reply_text("No activity yet! Get chatting! 😛")
