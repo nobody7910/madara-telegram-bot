@@ -1,3 +1,4 @@
+# bot.py
 import logging
 from telegram import Update
 from telegram.ext import (
@@ -9,7 +10,7 @@ from telegram.ext import (
     ContextTypes
 )
 from config import BOT_TOKEN
-from handlers.general_commands import start, help_command
+from handlers.general_commands import start, help_command, commands_menu
 from handlers.group_stats import get_group_stats, get_top_members, get_message_frequency
 from handlers.user_info import get_user_info
 from handlers.group import (
@@ -73,6 +74,10 @@ def register_handlers(application):
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, track_messages))
     application.add_handler(CallbackQueryHandler(handle_stat_callback, pattern=r'^stat_'))
     application.add_handler(CallbackQueryHandler(help_command, pattern=r'^(help_|fun_)'))
+    application.add_handler(CallbackQueryHandler(commands_menu, pattern=r'^(commands_start_|cmd_)'))  # Updated to handle both patterns
+    application.add_handler(CallbackQueryHandler(lambda update, context: update.callback_query.answer(), pattern=r'^noop$'))  # No-op for disabled buttons
+    application.add_handler(CallbackQueryHandler(lambda update, context: update.callback_query.message.delete(), pattern=r'^commands_close$'))  # Close button
+    application.add_handler(CallbackQueryHandler(lambda update, context: start(update, context), pattern=r'^commands_back$'))  # Back to start menu
     logger.info("Handlers registered successfully.")
 
 def main() -> None:

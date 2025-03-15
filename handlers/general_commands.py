@@ -15,18 +15,24 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     bot_photos = await context.bot.get_user_profile_photos(context.bot.id, limit=1)
     user_link = f"https://t.me/{user.username}" if user.username else f"tg://user?id={user.id}"
     intro = (
-        f"👋 Yo yo, {user.first_name} ( [{user.first_name}]({user_link}) )! Welcome aboard! 👋\n"
-        f"I’m *Mᴀᴅᴀʀᴀ⚡Cʜᴀᴛ🌀*, your ultimate group companion! 🔥\n"
-        f"Ready to spice up your chats with stats, fun, and moderation? 🎉\n"
-        f"Hit the buttons below to get started or get help! 🚀\n"
-        f"Add me to your squad and let’s make it legendary! 🌟\n"
-        f"Questions? Support’s got your back—tap below! ☘️"
+        f"ɪᴀᴍ❂ Mᴀᴅᴀʀᴀ⚡️Cʜᴀᴛ🌀 ❂\n"
+        f"× ʜᴇʟʟᴏ {user.first_name} ( [{user.first_name}]({user_link}) )\n"
+        f"×⋆✦⋆──────────────⋆✦⋆×\n"
+        f" Rᴇᴀᴅʏ ᴛᴏ ʀᴏʟʟ ᴜᴘ ᴡɪᴛʜ ᴍᴇ 🎉\n"
+        f"×⋆✦⋆──────────────⋆✦⋆×\n"
+        f"Hɪᴛ ᴛʜᴇ ʙᴜᴛᴛᴏɴs ʙᴇʟᴏᴡ ᴛᴏ ɢᴇᴛ sᴛᴀʀᴛᴇᴅ ᴏʀ ɢᴇᴛ ʜᴇʟᴘ! 🚀\n"
+        f"Aᴅᴅ ᴍᴇ ᴛᴏ ʏᴏᴜʀ sǫᴜᴀᴅ ᴀɴᴅ ʟᴇᴛ’s ᴍᴀᴋᴇ ɪᴛ ʟᴇɢᴇɴᴅᴀʀʏ! 🌟\n"
+        f"Qᴜᴇsᴛɪᴏɴs? Sᴜᴘᴘᴏʀᴛ’s ɢᴏᴛ ʏᴏᴜʀ ʙᴀᴄᴋ—ᴛᴀᴘ ʙᴇʟᴏᴡ! ☘️\n"
+        f" ────────────── \n"
+        f"𝐌ᴀᴅᴀʀᴀ 𝐔ᴄʜɪʜᴀ!! \n"
+        f"Wᴀᴋᴇ ᴜᴘ ᴛᴏ ʀᴇᴀʟɪᴛʏ! ɴᴏᴛʜɪɴɢ ᴇᴠᴇʀ ɢᴏᴇs ᴀs ᴘʟᴀɴɴᴇᴅ ɪɴ ᴛʜɪs ᴀᴄᴄᴜʀsᴇᴅ ᴡᴏʀʟᴅ.Tʜᴇ ʟᴏɴɢᴇʀ ʏᴏᴜ ʟɪᴠᴇ, ᴛʜᴇ ᴍᴏʀᴇ ʏᴏᴜ ʀᴇᴀʟɪᴢᴇ ᴛʜᴀᴛ ᴛʜᴇ ᴏɴʟʏ ᴛʜɪɴɢs ᴛʜᴀᴛ ᴛʀᴜʟʏ ᴇxɪsᴛ ɪɴ ᴛʜɪs ʀᴇᴀʟɪᴛʏ ᴀʀᴇ ᴍᴇʀᴇʟʏ ᴘᴀɪɴ, sᴜғғᴇʀɪɴɢ ᴀɴᴅ ғᴜᴛɪʟɪᴛʏ.!!"
     )
     
     keyboard = [
-        [InlineKeyboardButton("➕ Add me to group", url="https://t.me/Madara7_chat_bot?startgroup=true")],
-        [InlineKeyboardButton("ℹ️ info", url="https://t.me/Sung_jin_woo_79"),
-         InlineKeyboardButton("📞 Support", url="https://t.me/+rh41IlhjtHVjZWY1")]
+        [InlineKeyboardButton("➕ 𝐀ᴅᴅ 𝐌ᴇ 𝐓ᴏ 𝐆ʀᴏᴜᴘ", url="https://t.me/Madara7_chat_bot?startgroup=true")],
+        [InlineKeyboardButton("ℹ️ 𝗜𝗡𝗙𝗢", url="https://t.me/Sung_jin_woo_79"),
+         InlineKeyboardButton("📞 𝗦𝗨𝗣𝗣𝗢𝗥𝗧", url="https://t.me/+rh41IlhjtHVjZWY1")],
+        [InlineKeyboardButton("𝗖𝗢𝗠𝗠𝗔𝗡𝗗𝗦📜", callback_data="commands_start_0")]  # Moved to a new row
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
@@ -45,6 +51,147 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             reply_markup=reply_markup,
             parse_mode="Markdown"
         )
+
+# Existing commands list for the help menu (to reuse in commands menu)
+COMMANDS_LIST = [
+    "info", "photo", "stat", "members", "top", "mute", "unmute", "active", 
+    "rank", "warn", "kick", "ban", "afk", "fun"
+]
+
+# Pagination settings
+COMMANDS_PER_PAGE = 9  # Matches your example image (3 rows x 3 columns)
+
+# Command summaries (moved here to be shared between help_command and commands_menu)
+SUMMARIES = {
+    "help_info": "ℹ️ /info - Shows user PFP + dope details!",
+    "help_photo": "📸 /photo - Grabs recent PFPs!",
+    "help_stat": "📊 /stat - Leaderboard with top chatters!",
+    "help_members": "👥 /members - Tags all members (admin only)!",
+    "help_top": "🏆 /top - Top 3 chatterboxes!",
+    "help_mute": "🔇 /mute - Mutes a user (admin only) via reply or /mute @username!",
+    "help_unmute": "🔊 /unmute - Unmutes a user (admin only) via reply or /unmute @username!",
+    "help_active": "🌟 /active - Counts active users!",
+    "help_rank": "🥇 /rank - Top 5 message senders!",
+    "help_warn": "⚠️ /warn - Warns a user (admin only) via reply or /warn @username!",
+    "help_kick": "👢 /kick - Kicks a user (admin only) via reply or /kick @username!",
+    "help_ban": (
+        "🚫 **BAN HAMMER ALERT!** 🚫\n"
+        "🔒 /ban - Ban a user (admin only) via reply or /ban @username!\n"
+        "🎉 Example: Banished [{user}](link) from *group*! 👋\n"
+        "🌟 Keeps the group safe and epic! 🔥"
+    ),
+    "help_afk": "😴 /afk - Mark yourself AFK with a custom message!",
+    "help_fun": "🎉 Fun Commands:\nRandom anime pics from waifu.pics!"
+}
+
+async def commands_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle the commands menu with pagination, similar to /help."""
+    query = update.callback_query
+    data = query.data
+
+    if data.startswith("commands_start_"):
+        page = int(data.split("_")[-1])  # Extract the page number from callback_data
+        
+        # Calculate the start and end indices for the current page
+        start_idx = page * COMMANDS_PER_PAGE
+        end_idx = start_idx + COMMANDS_PER_PAGE
+        current_commands = COMMANDS_LIST[start_idx:end_idx]
+
+        # Prepare the keyboard layout (3x3 grid as in the example image)
+        keyboard = []
+        row = []
+        for idx, cmd in enumerate(current_commands):
+            button_text = cmd.upper()
+            if cmd == "info":
+                button_text = "ℹ️ 𝐈𝐍𝐅𝐎"
+            elif cmd == "photo":
+                button_text = "📸 𝐏𝐇𝐎𝐓𝐎"
+            elif cmd == "stat":
+                button_text = "📊 𝐒𝐓𝐀𝐓 "
+            elif cmd == "members":
+                button_text = "👥 𝐌𝐄𝐌𝐁𝐄𝐑𝐒"
+            elif cmd == "top":
+                button_text = "🏆 𝐓𝐎𝐏"
+            elif cmd == "mute":
+                button_text = "🔇 𝐌𝐔𝐓𝐄"
+            elif cmd == "unmute":
+                button_text = "🔊 𝐔𝐍𝐌𝐔𝐓𝐄 "
+            elif cmd == "active":
+                button_text = "🌟 𝐀𝐂𝐓𝐈𝐕𝐄"
+            elif cmd == "rank":
+                button_text = "🥇 𝐑𝐀𝐍𝐊"
+            elif cmd == "warn":
+                button_text = "⚠️ 𝐖𝐀𝐑𝐍"
+            elif cmd == "kick":
+                button_text = "👢 𝐊𝐈𝐂𝐊"
+            elif cmd == "ban":
+                button_text = "🚫 𝐁𝐀𝐍"
+            elif cmd == "afk":
+                button_text = "😴 𝐀𝐅𝐊 "
+            elif cmd == "fun":
+                button_text = "🎉 𝐅𝐔𝐍 "
+
+            # Include the page number in the callback data so we can return to the same page
+            row.append(InlineKeyboardButton(button_text, callback_data=f"cmd_{cmd}_{page}"))
+            if (idx + 1) % 3 == 0 or idx == len(current_commands) - 1:
+                keyboard.append(row)
+                row = []
+
+        # Add navigation buttons (backward, back, forward, close)
+        total_pages = (len(COMMANDS_LIST) + COMMANDS_PER_PAGE - 1) // COMMANDS_PER_PAGE
+        nav_buttons = []
+        
+        # Backward button
+        if page > 0:
+            nav_buttons.append(InlineKeyboardButton("◀", callback_data=f"commands_start_{page - 1}"))
+        else:
+            nav_buttons.append(InlineKeyboardButton("◀", callback_data="noop"))  # Disabled button
+
+        # Back button (returns to the start menu)
+        nav_buttons.append(InlineKeyboardButton("BACK", callback_data="commands_back"))
+
+        # Forward button
+        if page < total_pages - 1:
+            nav_buttons.append(InlineKeyboardButton("▶", callback_data=f"commands_start_{page + 1}"))
+        else:
+            nav_buttons.append(InlineKeyboardButton("▶", callback_data="noop"))  # Disabled button
+
+        # Close button (bin)
+        nav_buttons.append(InlineKeyboardButton("🗑️", callback_data="commands_close"))
+
+        keyboard.append(nav_buttons)
+
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        help_text = (
+            "🫧 Mᴀᴅᴀʀᴀ Cʜᴀᴛ 🫧\n"
+            f"⬇️ Lɪsᴛ Pᴀɢᴇ {page + 1}/{total_pages}\n"
+            "☉ Hᴇʀᴇ, ʏᴏᴜ ᴡɪʟʟ ғɪɴᴅ ᴀ ʟɪsᴛ ᴏғ ᴀʟʟ ᴛʜᴇ ᴀᴠᴀɪʟᴀʙʟᴇ ᴄᴏᴍᴍᴀɴᴅs.\n"
+            "ᴀʟʟ ᴄᴏᴍᴍᴀɴᴅs ᴄᴀɴ ʙᴇ ᴜsᴇᴅ ᴡɪᴛʜ : /"
+        )
+
+        # Check if the original message is a photo and edit caption if true, otherwise edit text
+        if query.message.photo:
+            await query.edit_message_caption(caption=help_text, reply_markup=reply_markup, parse_mode="Markdown")
+        else:
+            await query.edit_message_text(text=help_text, reply_markup=reply_markup, parse_mode="Markdown")
+        await query.answer()
+
+    elif data.startswith("cmd_"):
+        # Handle command summary display
+        parts = data.split("_")
+        cmd = parts[1]  # e.g., "info", "ban", etc.
+        page = int(parts[2])  # The page to return to
+
+        summary = SUMMARIES.get(f"help_{cmd}", f"No description available for /{cmd}.")
+        
+        back_button = [[InlineKeyboardButton("⬅️ Back", callback_data=f"commands_start_{page}")]]
+        reply_markup = InlineKeyboardMarkup(back_button)
+
+        if query.message.photo:
+            await query.edit_message_caption(caption=summary, reply_markup=reply_markup, parse_mode="Markdown")
+        else:
+            await query.edit_message_text(text=summary, reply_markup=reply_markup, parse_mode="Markdown")
+        await query.answer()
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat = update.effective_chat
@@ -75,7 +222,10 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             "Commands: /help, /info, /photo, /stat, /members, /top, /mute, /unmute, /active, /rank, /warn, /kick, /ban, /afk, /waifus..."
         )
         if query:
-            await query.edit_message_text(text=help_text, reply_markup=reply_markup)
+            if query.message.photo:
+                await query.edit_message_caption(caption=help_text, reply_markup=reply_markup, parse_mode="Markdown")
+            else:
+                await query.edit_message_text(text=help_text, reply_markup=reply_markup)
             await query.answer()
         else:
             await context.bot.send_message(chat_id=chat.id, text=help_text, reply_markup=reply_markup)
@@ -86,38 +236,18 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             await query.answer()
             return
         
-        summaries = {
-            "help_info": "ℹ️ /info - Shows user PFP + dope details!",
-            "help_photo": "📸 /photo - Grabs recent PFPs!",
-            "help_stat": "📊 /stat - Leaderboard with top chatters!",
-            "help_members": "👥 /members - Tags all members (admin only)!",
-            "help_top": "🏆 /top - Top 3 chatterboxes!",
-            "help_mute": "🔇 /mute - Mutes a user (admin only) via reply or /mute @username!",
-            "help_unmute": "🔊 /unmute - Unmutes a user (admin only) via reply or /unmute @username!",
-            "help_active": "🌟 /active - Counts active users!",
-            "help_rank": "🥇 /rank - Top 5 message senders!",
-            "help_warn": "⚠️ /warn - Warns a user (admin only) via reply or /warn @username!",
-            "help_kick": "👢 /kick - Kicks a user (admin only) via reply or /kick @username!",
-            "help_ban": (
-                "🚫 **BAN HAMMER ALERT!** 🚫\n"
-                "🔒 /ban - Ban a user (admin only) via reply or /ban @username!\n"
-                "🎉 Example: Banished [{user}](link) from *group*! 👋\n"
-                "🌟 Keeps the group safe and epic! 🔥"
-            ),
-            "help_afk": "😴 /afk - Mark yourself AFK with a custom message!"
-        }
-        if data in summaries:
+        if data in SUMMARIES:
             back_button = [[InlineKeyboardButton("⬅️ Back", callback_data="help_back"),
                             InlineKeyboardButton("❌ Close", callback_data="help_close")]]
             reply_markup = InlineKeyboardMarkup(back_button)
-            await query.edit_message_text(summaries[data], reply_markup=reply_markup, parse_mode="Markdown")
+            await query.edit_message_text(SUMMARIES[data], reply_markup=reply_markup, parse_mode="Markdown")
             await query.answer()
         elif data == "help_fun":
             fun_keyboard = [[InlineKeyboardButton(f"/{cmd}", callback_data=f"fun_{cmd}")] for cmd in FUN_COMMANDS.keys()]
             fun_keyboard.append([InlineKeyboardButton("⬅️ Back", callback_data="help_back"),
                                  InlineKeyboardButton("❌ Close", callback_data="help_close")])
             reply_markup = InlineKeyboardMarkup(fun_keyboard)
-            await query.edit_message_text("🎉 Fun Commands:\nRandom anime pics from waifu.pics!", reply_markup=reply_markup)
+            await query.edit_message_text(SUMMARIES["help_fun"], reply_markup=reply_markup)
             await query.answer()
         elif data.startswith("fun_"):
             cmd = data.split("_")[1]
