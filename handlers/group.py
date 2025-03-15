@@ -12,13 +12,8 @@ from utils.db import get_db
 
 logger = logging.getLogger(__name__)
 
-# Initialize MongoDB collections
-db = get_db()
-message_counts = db.get_collection('message_counts')
-chat_data = db.get_collection('chat_data')
-warnings = db.get_collection('warnings')
-afk_users = db.get_collection('afk_users')
-tagging_operations = {}  # Keep this in-memory for simplicity
+# Move collection initialization inside async functions
+# No module-level db or collection assignments
 
 async def track_messages(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat = update.effective_chat
@@ -30,8 +25,13 @@ async def track_messages(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     user_id = str(user.id)
     today = datetime.now().date().isoformat()
     
+    # Get the database collection inside the async function
+    db = await get_db()
+    message_counts = db.get_collection('message_counts')
+    chat_data = db.get_collection('chat_data')
+    
     # Update message counts in MongoDB
-    message_counts.update_one(
+    await message_counts.update_one(
         {'chat_id': chat_id, 'user_id': user_id},
         {
             '$inc': {f'daily.{today}': 1, 'monthly': 1},
@@ -42,7 +42,7 @@ async def track_messages(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     
     # Update chat data in MongoDB
     admins = await chat.get_administrators()
-    chat_data.update_one(
+    await chat_data.update_one(
         {'chat_id': chat_id},
         {
             '$set': {
@@ -56,7 +56,8 @@ async def track_messages(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     )
     
     # Check AFK status
-    afk_record = afk_users.find_one({'chat_id': chat_id, 'user_id': user_id})
+    afk_users = db.get_collection('afk_users')
+    afk_record = await afk_users.find_one({'chat_id': chat_id, 'user_id': user_id})
     if afk_record:
         afk_time = datetime.fromisoformat(afk_record['time'])
         duration = (datetime.now() - afk_time).total_seconds() // 60
@@ -64,7 +65,7 @@ async def track_messages(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             f"🎉 Welcome back, {user.first_name}! You were AFK for {duration} mins.\n"
             f"Last AFK reason: {afk_record['message']}"
         )
-        afk_users.delete_one({'chat_id': chat_id, 'user_id': user_id})
+        await afk_users.delete_one({'chat_id': chat_id, 'user_id': user_id})
 
 async def welcome_new_member(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat = update.effective_chat
@@ -168,9 +169,13 @@ async def generate_leaderboard(update: Update, context: ContextTypes.DEFAULT_TYP
     active_count = 0
     chat_id_str = str(chat_id)
     
+    # Get the database collection inside the async function
+    db = await get_db()
+    message_counts = db.get_collection('message_counts')
+    
     # Fetch message counts from MongoDB
     chat_records = message_counts.find({'chat_id': chat_id_str})
-    chat_records_list = list(chat_records)
+    chat_records_list = await chat_records.to_list(length=None)
     if not chat_records_list:
         if update.callback_query:
             await update.callback_query.message.reply_text("No stats yet! Start chatting!")
@@ -185,8 +190,8 @@ async def generate_leaderboard(update: Update, context: ContextTypes.DEFAULT_TYP
         user_id = record['user_id']
         try:
             user = await context.bot.get_chat_member(chat_id, int(user_id))
-            username = user.user.username or user.user.first_name  # Still needed for image
-            link = f"https://t.me/{user.user.username}" if user.user.username else ""  # Keep for fallback
+            username = user.user.username or user.user.first_name
+            link = f"https://t.me/{user.user.username}" if user.user.username else ""
             daily = record.get('daily', {})
             if period == "today":
                 count = daily.get(start_time.date().isoformat(), 0)
@@ -200,7 +205,7 @@ async def generate_leaderboard(update: Update, context: ContextTypes.DEFAULT_TYP
             else:
                 count = record.get('monthly', 0)
             if count > 0:
-                users.append((username, link, count, user.user.first_name, user.user.id))  # Add first_name and id
+                users.append((username, link, count, user.user.first_name, user.user.id))
                 total_msgs += count
             last_seen = record.get('last_seen')
             if last_seen and (now - datetime.fromisoformat(last_seen)) <= timedelta(hours=24):
@@ -253,22 +258,38 @@ async def generate_leaderboard(update: Update, context: ContextTypes.DEFAULT_TYP
         emoji = "👤" if i == 1 else "👤"
         caption += f"{i}. {emoji} [{first_name}](tg://user?id={user_id}) • {count} msgs\n"
     caption += f"\n✉️ *Total Messages:* {total_msgs}"
+    # Add stat message only for non-"all" periods
+    if period in ["today", "yesterday", "month"]:
+        caption += f"\nThis is your {period} stat of group"
 
+    # Add Back button for "today", "yesterday", "month"; exclude for "all"
     keyboard = [
-        [InlineKeyboardButton("Today", callback_data=f"stat_today_{chat_id}"),
-         InlineKeyboardButton("Yesterday", callback_data=f"stat_yesterday_{chat_id}"),
-         InlineKeyboardButton("Month", callback_data=f"stat_month_{chat_id}")]
+        [
+            InlineKeyboardButton("Today", callback_data=f"stat_today_{chat_id}"),
+            InlineKeyboardButton("Yesterday", callback_data=f"stat_yesterday_{chat_id}"),
+            InlineKeyboardButton("Month", callback_data=f"stat_month_{chat_id}")
+        ]
     ]
+    if period != "all":
+        keyboard.append([InlineKeyboardButton("⬅️ Back", callback_data=f"stat_all_{chat_id}")])
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     with open("leaderboard.png", "rb") as photo:
-        await context.bot.send_photo(
-            chat_id=chat_id,
-            photo=photo,
-            caption=caption,
-            parse_mode="Markdown",
-            reply_markup=reply_markup
-        )
+        if update.callback_query:
+            await update.callback_query.edit_message_caption(
+                caption=caption,
+                reply_markup=reply_markup,
+                parse_mode="Markdown"
+            )
+            await update.callback_query.answer()
+        else:
+            await context.bot.send_photo(
+                chat_id=chat_id,
+                photo=photo,
+                caption=caption,
+                parse_mode="Markdown",
+                reply_markup=reply_markup
+            )
 
 async def kick_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat = update.effective_chat
@@ -434,20 +455,24 @@ async def warn_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     chat_id = str(chat.id)
     user_id = str(target.id)
     
+    # Get the database collection inside the async function
+    db = await get_db()
+    warnings = db.get_collection('warnings')
+    
     # Update warnings in MongoDB
-    warnings.update_one(
+    await warnings.update_one(
         {'chat_id': chat_id, 'user_id': user_id},
         {'$inc': {'count': 1}},
         upsert=True
     )
-    warn_record = warnings.find_one({'chat_id': chat_id, 'user_id': user_id})
+    warn_record = await warnings.find_one({'chat_id': chat_id, 'user_id': user_id})
     warn_count = warn_record['count']
     
     if warn_count >= 3:
         try:
             await chat.ban_member(target.id)
             await message.reply_text(f"⚠️ {target.first_name} hit 3 warnings—bam, banned! 👋")
-            warnings.delete_one({'chat_id': chat_id, 'user_id': user_id})
+            await warnings.delete_one({'chat_id': chat_id, 'user_id': user_id})
         except TelegramError as e:
             await message.reply_text(f"Couldn’t ban {target.first_name}: {e}")
     else:
@@ -551,10 +576,15 @@ async def members_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             del tagging_operations[chat_id]
             return
         
+        # Get the database collection inside the async function
+        db = await get_db()
+        message_counts = db.get_collection('message_counts')
+        
         # Use message_counts from MongoDB to tag active users
         active_users = message_counts.find({'chat_id': chat_id, 'monthly': {'$gt': 0}})
         member_list = []
-        for record in active_users.limit(50):  # Limit to 50 for testing
+        active_users_list = await active_users.to_list(length=None)
+        for record in active_users_list:  # Limit to 50 for testing
             try:
                 member = await context.bot.get_chat_member(chat.id, int(record['user_id']))
                 member_list.append(member.user)
@@ -612,8 +642,13 @@ async def rank_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         return
     
     chat_id = str(chat.id)
+    
+    # Get the database collection inside the async function
+    db = await get_db()
+    message_counts = db.get_collection('message_counts')
+    
     ranked = message_counts.find({'chat_id': chat_id}).sort('monthly', -1).limit(5)
-    ranked_list = list(ranked)  # Convert Cursor to list
+    ranked_list = await ranked.to_list(length=None)  # Convert Cursor to list
     if not ranked_list:  # Check if list is empty
         await update.message.reply_text("No chatter yet! Start talking to climb the ranks! 😛")
         return
@@ -635,8 +670,13 @@ async def top_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         return
     
     chat_id = str(chat.id)
+    
+    # Get the database collection inside the async function
+    db = await get_db()
+    message_counts = db.get_collection('message_counts')
+    
     ranked = message_counts.find({'chat_id': chat_id}).sort('monthly', -1).limit(3)
-    ranked_list = list(ranked)  # Convert Cursor to list
+    ranked_list = await ranked.to_list(length=None)  # Convert Cursor to list
     if not ranked_list:  # Check if list is empty
         await update.message.reply_text("No top dogs yet! Chat more to claim the throne! 👑")
         return
@@ -659,13 +699,19 @@ async def active_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     
     chat_id = str(chat.id)
     now = datetime.now()
+    
+    # Get the database collection inside the async function
+    db = await get_db()
+    message_counts = db.get_collection('message_counts')
+    chat_data = db.get_collection('chat_data')
+    
     active_users = message_counts.find({
         'chat_id': chat_id,
         'last_seen': {'$gte': (now - timedelta(hours=24)).isoformat()}
     })
-    active_users_list = list(active_users)  # Convert Cursor to list
+    active_users_list = await active_users.to_list(length=None)  # Convert Cursor to list
     active_count = len(active_users_list)  # Count the list length
-    chat_record = chat_data.find_one({'chat_id': chat_id})
+    chat_record = await chat_data.find_one({'chat_id': chat_id})
     if not chat_record:
         await update.message.reply_text("No activity yet! Get chatting! 😛")
         return
@@ -686,6 +732,16 @@ async def handle_stat_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     data = query.data
     if data.startswith("stat_"):
         period, chat_id = data.split("_")[1], int(data.split("_")[2])
+        chat = update.effective_chat
+        user = query.from_user
+
+        # Check if the user is an admin
+        admins = await context.bot.get_chat_administrators(chat.id)
+        admin_ids = {admin.user.id for admin in admins}
+        if user.id not in admin_ids:
+            await query.answer("Only group admins can use these buttons! 🔒", show_alert=True)
+            return
+
         await generate_leaderboard(update, context, chat_id, period)
         await query.answer()
 
@@ -702,10 +758,17 @@ async def afk_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     if update.message.reply_to_message:
         afk_msg = update.message.reply_to_message.text
     
+    # Get the database collection inside the async function
+    db = await get_db()
+    afk_users = db.get_collection('afk_users')
+    
     # Update AFK status in MongoDB
-    afk_users.update_one(
+    await afk_users.update_one(
         {'chat_id': chat_id, 'user_id': user_id},
         {'$set': {'time': datetime.now().isoformat(), 'message': afk_msg}},
         upsert=True
     )
     await update.message.reply_text(f"✨ {user.first_name} is now AFK! Reason: {afk_msg}")
+
+# Global dictionary to track tagging operations (should be defined at module level)
+tagging_operations = {}

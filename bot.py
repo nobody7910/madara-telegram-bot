@@ -7,6 +7,7 @@ from telegram.ext import (
     MessageHandler,
     filters,
     CallbackQueryHandler,
+    InlineQueryHandler,
     ContextTypes
 )
 from config import BOT_TOKEN
@@ -20,6 +21,9 @@ from handlers.group import (
     welcome_new_member, cancel_command, ban_command
 )
 from handlers.fun import register_fun_handlers
+from handlers.new_commands import (
+    couple_command, whisper_inline, fonts_command, font_callback, filter_command, handle_filters
+)
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -44,7 +48,12 @@ def register_handlers(application):
     application.add_handler(CommandHandler("message_freq", get_message_frequency))
     application.add_handler(CommandHandler("leaderboard", leaderboard_command))
     application.add_handler(CommandHandler("afk", afk_command))
-    
+    application.add_handler(CommandHandler(["couple", "couples", "shipping"], couple_command))
+    application.add_handler(InlineQueryHandler(whisper_inline))
+    application.add_handler(CommandHandler(["fonts", "font"], fonts_command))
+    application.add_handler(CommandHandler("filter", filter_command))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_filters))
+
     # Fun commands (no admin needed)
     register_fun_handlers(application)
 
@@ -67,17 +76,18 @@ def register_handlers(application):
     application.add_handler(CommandHandler("kick", lambda u, c: check_admin(u, c, kick_command)))
     application.add_handler(CommandHandler("members", lambda u, c: check_admin(u, c, members_command)))
     application.add_handler(CommandHandler("cancel", cancel_command))
-    application.add_handler(CommandHandler("ban", lambda u, c: check_admin(u, c, ban_command)))  # Added ban command
+    application.add_handler(CommandHandler("ban", lambda u, c: check_admin(u, c, ban_command)))
 
     # Message tracking, welcome, and callbacks
-    application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome_new_member))  # Added for welcome
+    application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome_new_member))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, track_messages))
     application.add_handler(CallbackQueryHandler(handle_stat_callback, pattern=r'^stat_'))
     application.add_handler(CallbackQueryHandler(help_command, pattern=r'^(help_|fun_)'))
-    application.add_handler(CallbackQueryHandler(commands_menu, pattern=r'^(commands_start_|cmd_)'))  # Updated to handle both patterns
-    application.add_handler(CallbackQueryHandler(lambda update, context: update.callback_query.answer(), pattern=r'^noop$'))  # No-op for disabled buttons
-    application.add_handler(CallbackQueryHandler(lambda update, context: update.callback_query.message.delete(), pattern=r'^commands_close$'))  # Close button
-    application.add_handler(CallbackQueryHandler(lambda update, context: start(update, context), pattern=r'^commands_back$'))  # Back to start menu
+    application.add_handler(CallbackQueryHandler(commands_menu, pattern=r'^(commands_start_|cmd_)'))
+    application.add_handler(CallbackQueryHandler(font_callback, pattern=r'^font_'))
+    application.add_handler(CallbackQueryHandler(lambda update, context: update.callback_query.answer(), pattern=r'^noop$'))
+    application.add_handler(CallbackQueryHandler(lambda update, context: update.callback_query.message.delete(), pattern=r'^commands_close$'))
+    application.add_handler(CallbackQueryHandler(lambda update, context: start(update, context), pattern=r'^commands_back$'))
     logger.info("Handlers registered successfully.")
 
 def main() -> None:
