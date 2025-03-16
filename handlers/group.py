@@ -80,12 +80,14 @@ async def welcome_new_member(update: Update, context: ContextTypes.DEFAULT_TYPE)
         first_name_safe = member.first_name.replace("[", "\\[").replace("]", "\\]")
         username_safe = member.username if member.username else "N/A"
         welcome_text = (
-            f"🎉 Woohoo! A wild {first_name_safe} has joined the party! 🎉\n"
-            f"Get ready for some epic vibes in *{chat.title}*! 🌟\n\n"
-            f"👤 Name: [{first_name_safe}]({member_link})\n"
-            f"📛 Username: @{username_safe}\n"
-            f"🆔 ID: {member.id}\n"
-            f"Let’s make it legendary—follow the rules and enjoy! ☘️"
+            f"┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━⧫\n"
+            f"┠●🎉 нєу вυ∂∂у ωєℓ¢σмє  {first_name_safe} нαѕ ʝσιηє∂ тнє gяσυρ 🎉\n"
+            f"┠● ωσяℓ∂ ιѕ υηρяє∂ι¢тαвℓє 🫧*{chat.title}*! 🌟\n\n"
+            f"┠●👤 ƒιяѕт ηαмє [{first_name_safe}]({member_link})\n"
+            f"┠●📛 υѕєяηαмє: @{username_safe}\n"
+            f"┠●🆔 ι∂: {member.id}\n"
+            f"┠● ℓєтѕ мαкє α gσσ∂ єηνιяσηмєηт, ƒσℓℓσω тнє яυℓєѕ ☘️\n"
+            f"┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━⧫"
         )
         keyboard = [[InlineKeyboardButton("📜 Group Rules", url="https://t.me/RULES_FOR_GROUPS_791/3")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
