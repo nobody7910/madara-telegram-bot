@@ -29,7 +29,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     )
     
     keyboard = [
-        [InlineKeyboardButton("➕ 𝐀ᴅᴅ 𝐌ᴇ 𝐓ᴏ 𝐆ʀᴏᴜᴘ", url="https://t.me/Madara7_chat_bot?startgroup=true")],
+        [InlineKeyboardButton("➕ 𝗔𝗗𝗗 𝗠𝗘 𝗧𝗢 𝗚𝗥𝗢𝗨𝗣", url="https://t.me/Madara7_chat_bot?startgroup=true")],
         [InlineKeyboardButton("ℹ️ 𝗜𝗡𝗙𝗢", url="https://t.me/Sung_jin_woo_79"),
          InlineKeyboardButton("📞 𝗦𝗨𝗣𝗣𝗢𝗥𝗧", url="https://t.me/+rh41IlhjtHVjZWY1")],
         [InlineKeyboardButton("𝗖𝗢𝗠𝗠𝗔𝗡𝗗𝗦📜", callback_data="commands_start_0")]  # Moved to a new row
@@ -103,33 +103,33 @@ async def commands_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         for idx, cmd in enumerate(current_commands):
             button_text = cmd.upper()
             if cmd == "info":
-                button_text = "ℹ️ 𝐈𝐍𝐅𝐎"
+                button_text = "ℹ️ ɪɴғᴏ"
             elif cmd == "photo":
-                button_text = "📸 𝐏𝐇𝐎𝐓𝐎"
+                button_text = "📸 ᴘʜᴏᴛᴏ"
             elif cmd == "stat":
-                button_text = "📊 𝐒𝐓𝐀𝐓 "
+                button_text = "📊 sᴛᴀᴛ "
             elif cmd == "members":
-                button_text = "👥 𝐌𝐄𝐌𝐁𝐄𝐑𝐒"
+                button_text = "👥 ᴍᴇᴍʙᴇʀs"
             elif cmd == "top":
-                button_text = "🏆 𝐓𝐎𝐏"
+                button_text = "🏆 ᴛᴏᴘ"
             elif cmd == "mute":
-                button_text = "🔇 𝐌𝐔𝐓𝐄"
+                button_text = "🔇 ᴍᴜᴛᴇ"
             elif cmd == "unmute":
-                button_text = "🔊 𝐔𝐍𝐌𝐔𝐓𝐄 "
+                button_text = "🔊 ᴜɴᴍᴜᴛᴇ"
             elif cmd == "active":
-                button_text = "🌟 𝐀𝐂𝐓𝐈𝐕𝐄"
+                button_text = "🌟 ᴀᴄᴛɪᴠᴇ"
             elif cmd == "rank":
-                button_text = "🥇 𝐑𝐀𝐍𝐊"
+                button_text = "🥇 ʀᴀɴᴋ"
             elif cmd == "warn":
-                button_text = "⚠️ 𝐖𝐀𝐑𝐍"
+                button_text = "⚠️ ᴡᴀʀɴ"
             elif cmd == "kick":
-                button_text = "👢 𝐊𝐈𝐂𝐊"
+                button_text = "👢 ᴋɪᴄᴋ"
             elif cmd == "ban":
-                button_text = "🚫 𝐁𝐀𝐍"
+                button_text = "🚫 ʙᴀɴ"
             elif cmd == "afk":
-                button_text = "😴 𝐀𝐅𝐊 "
+                button_text = "😴 ᴀғᴋ"
             elif cmd == "fun":
-                button_text = "🎉 𝐅𝐔𝐍 "
+                button_text = "🎉 ғᴜɴ"
 
             # Include the page number in the callback data so we can return to the same page
             row.append(InlineKeyboardButton(button_text, callback_data=f"cmd_{cmd}_{page}"))
@@ -199,26 +199,26 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     
     if not query or query.data in ["help_back", "help_start"]:
         keyboard = [
-            [InlineKeyboardButton("ℹ️ Info", callback_data="help_info"),
-             InlineKeyboardButton("📸 Photo", callback_data="help_photo")],
-            [InlineKeyboardButton("📊 Stat", callback_data="help_stat"),
-             InlineKeyboardButton("👥 Members", callback_data="help_members")],
-            [InlineKeyboardButton("🏆 Top", callback_data="help_top"),
-             InlineKeyboardButton("🔇 Mute", callback_data="help_mute")],
-            [InlineKeyboardButton("🔊 Unmute", callback_data="help_unmute"),
-             InlineKeyboardButton("🌟 Active", callback_data="help_active")],
-            [InlineKeyboardButton("🥇 Rank", callback_data="help_rank"),
-             InlineKeyboardButton("⚠️ Warn", callback_data="help_warn")],
-            [InlineKeyboardButton("👢 Kick", callback_data="help_kick"),
-             InlineKeyboardButton("🚫 Ban", callback_data="help_ban")],  # Added Ban
-            [InlineKeyboardButton("😴 AFK", callback_data="help_afk"),
-             InlineKeyboardButton("🎉 Fun", callback_data="help_fun")],
-            [InlineKeyboardButton("❌ Close", callback_data="help_close")]
+            [InlineKeyboardButton("ℹ️ ɪɴғᴏ", callback_data="help_info"),
+             InlineKeyboardButton("📸 ᴘʜᴏᴛᴏ", callback_data="help_photo")],
+            [InlineKeyboardButton("📊 sᴛᴀᴛ", callback_data="help_stat"),
+             InlineKeyboardButton("👥 ᴍᴇᴍʙᴇʀs", callback_data="help_members")],
+            [InlineKeyboardButton("🏆 ᴛᴏᴘ", callback_data="help_top"),
+             InlineKeyboardButton("🔇 ᴍᴜᴛᴇ", callback_data="help_mute")],
+            [InlineKeyboardButton("🔊 ᴜɴᴍᴜᴛᴇ", callback_data="help_unmute"),
+             InlineKeyboardButton("🌟 ᴀᴄᴛɪᴠᴇ", callback_data="help_active")],
+            [InlineKeyboardButton("🥇 ʀᴀɴᴋ", callback_data="help_rank"),
+             InlineKeyboardButton("⚠️ ᴡᴀʀɴ", callback_data="help_warn")],
+            [InlineKeyboardButton("👢 ᴋɪᴄᴋ", callback_data="help_kick"),
+             InlineKeyboardButton("🚫 ʙᴀɴ", callback_data="help_ban")],  # Added Ban
+            [InlineKeyboardButton("😴 ᴀғᴋ", callback_data="help_afk"),
+             InlineKeyboardButton("🎉 ғᴜɴ", callback_data="help_fun")],
+            [InlineKeyboardButton("❌ ᴄʟᴏsᴇ", callback_data="help_close")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         help_text = (
-            "Yo! I’m your slick bot! 😎\n"
-            "Tap a button to see what I can do!\n\n"
+            "нєу вυ∂∂у 🫣 нєяє му ¢σммαη∂ ℓιѕт\n"
+            "тαρ ση вυттσѕ тσ кησω ωнαт тнιηgѕ ι ¢αη ∂σ 🗿😎\n\n"
             "Commands: /help, /info, /photo, /stat, /members, /top, /mute, /unmute, /active, /rank, /warn, /kick, /ban, /afk, /waifus..."
         )
         if query:
