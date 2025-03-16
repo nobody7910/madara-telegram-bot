@@ -89,7 +89,7 @@ async def welcome_new_member(update: Update, context: ContextTypes.DEFAULT_TYPE)
             f"┠● ℓєтѕ мαкє α gσσ∂ єηνιяσηмєηт, ƒσℓℓσω тнє яυℓєѕ ☘️\n"
             f"┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━⧫"
         )
-        keyboard = [[InlineKeyboardButton("📜 Group Rules", url="https://t.me/RULES_FOR_GROUPS_791/3")]]
+        keyboard = [[InlineKeyboardButton("📜 ɢʀᴏᴜᴘ ʀᴜʟᴇs", url="https://t.me/RULES_FOR_GROUPS_791/3")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         if photos.photos:
@@ -120,7 +120,7 @@ async def info_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         photo_count = (await context.bot.get_user_profile_photos(user.id)).total_count
         
         info_text = (
-            f"【 User Information 】\n"
+            f"❖ ᴜsᴇʀ ɪɴғᴏʀᴍᴀᴛɪᴏɴ ❖\n"
             f"➢ ID: {user.id}\n"
             f"➢ First Name: {user.first_name}\n"
             f"➢ Last Name: {user.last_name if user.last_name else 'N/A'}\n"
@@ -267,9 +267,9 @@ async def generate_leaderboard(update: Update, context: ContextTypes.DEFAULT_TYP
     # Add Back button for "today", "yesterday", "month"; exclude for "all"
     keyboard = [
         [
-            InlineKeyboardButton("Today", callback_data=f"stat_today_{chat_id}"),
-            InlineKeyboardButton("Yesterday", callback_data=f"stat_yesterday_{chat_id}"),
-            InlineKeyboardButton("Month", callback_data=f"stat_month_{chat_id}")
+            InlineKeyboardButton("𝚃𝙾𝙳𝙰𝚈", callback_data=f"stat_today_{chat_id}"),
+            InlineKeyboardButton("𝚈𝚎𝚜𝚝𝚎𝚛𝚍𝚊𝚈", callback_data=f"stat_yesterday_{chat_id}"),
+            InlineKeyboardButton("𝙼𝙾𝙽𝚃𝙷", callback_data=f"stat_month_{chat_id}")
         ]
     ]
     if period != "all":
@@ -655,7 +655,7 @@ async def rank_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         await update.message.reply_text("No chatter yet! Start talking to climb the ranks! 😛")
         return
     
-    rank_text = f"🏆 Top Chatterboxes in {chat.title} 🏆\n"
+    rank_text = f"🏆 𝚃𝚘𝚙 𝚌𝚑𝚊𝚝𝚝𝚎𝚛𝚋𝚘𝚡𝚎𝚜 𝚒𝚗 𝚝𝚑𝚎 𝚐𝚛𝚘𝚞𝚙 🫡🥸{chat.title} 🏆\n"
     for i, record in enumerate(ranked_list, 1):
         user_id = record['user_id']
         try:
