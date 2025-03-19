@@ -1,4 +1,3 @@
-# utils/helpers.py
 from telegram import Bot
 import time
 

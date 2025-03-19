@@ -1,4 +1,3 @@
-# bot.py
 import logging
 from telegram import Update
 from telegram.ext import (
@@ -8,7 +7,8 @@ from telegram.ext import (
     filters,
     CallbackQueryHandler,
     InlineQueryHandler,
-    ContextTypes
+    ContextTypes,
+    ChatMemberHandler
 )
 from config import BOT_TOKEN
 from handlers.general_commands import start, help_command, commands_menu
@@ -18,11 +18,12 @@ from handlers.group import (
     stat_command, info_command, mute_command, unmute_command, top_command,
     active_command, track_messages, leaderboard_command, handle_stat_callback,
     members_command, rank_command, warn_command, kick_command, afk_command,
-    welcome_new_member, cancel_command, ban_command
+    welcome_new_member, cancel_command, ban_command, handle_chat_member
 )
 from handlers.fun import register_fun_handlers
 from handlers.new_commands import (
-    couple_command, whisper_inline, fonts_command, font_callback, filter_command, handle_filters
+    couple_command, whisper_inline, fonts_command, font_callback, filter_command, handle_filters,
+    stop_command, filterlist_command, paste_command, font_copy_callback  # Moved paste_command here, added font_copy_callback
 )
 
 logging.basicConfig(
@@ -51,8 +52,14 @@ def register_handlers(application):
     application.add_handler(CommandHandler(["couple", "couples", "shipping"], couple_command))
     application.add_handler(InlineQueryHandler(whisper_inline))
     application.add_handler(CommandHandler(["fonts", "font"], fonts_command))
+    application.add_handler(CallbackQueryHandler(font_callback, pattern="^font_"))
+    application.add_handler(CallbackQueryHandler(font_copy_callback, pattern="^font_copy_"))
+    application.add_handler(CommandHandler("paste", paste_command))  # Register paste_command
     application.add_handler(CommandHandler("filter", filter_command))
+    application.add_handler(CommandHandler("stop", stop_command))
+    application.add_handler(CommandHandler("filterlist", filterlist_command))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_filters))
+    application.add_handler(ChatMemberHandler(handle_chat_member, ChatMemberHandler.CHAT_MEMBER))  # Added for link joins
 
     # Fun commands (no admin needed)
     register_fun_handlers(application)
@@ -85,6 +92,7 @@ def register_handlers(application):
     application.add_handler(CallbackQueryHandler(help_command, pattern=r'^(help_|fun_)'))
     application.add_handler(CallbackQueryHandler(commands_menu, pattern=r'^(commands_start_|cmd_)'))
     application.add_handler(CallbackQueryHandler(font_callback, pattern=r'^font_'))
+    application.add_handler(CallbackQueryHandler(font_copy_callback, pattern=r'^font_copy_'))  # Ensure this is present
     application.add_handler(CallbackQueryHandler(lambda update, context: update.callback_query.answer(), pattern=r'^noop$'))
     application.add_handler(CallbackQueryHandler(lambda update, context: update.callback_query.message.delete(), pattern=r'^commands_close$'))
     application.add_handler(CallbackQueryHandler(lambda update, context: start(update, context), pattern=r'^commands_back$'))

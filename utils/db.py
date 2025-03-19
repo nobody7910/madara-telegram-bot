@@ -1,15 +1,14 @@
-# utils/db.py
 import pymongo
 from config import MONGO_URI
 import logging
 
 logger = logging.getLogger(__name__)
 
-class pixel:
+class Pixel:
     def __init__(self):
         try:
             self.client = pymongo.MongoClient(MONGO_URI)
-            self.db = self.client['madara_bot']  # Database name
+            self.db = self.client['madara_bot']
             logger.info("Connected to MongoDB successfully!")
         except Exception as e:
             logger.error(f"Failed to connect to MongoDB: {e}")
@@ -28,5 +27,5 @@ db_instance = None
 def get_db():
     global db_instance
     if db_instance is None:
-        db_instance = pixel()
+        db_instance = Pixel()
     return db_instance
