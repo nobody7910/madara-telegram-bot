@@ -1,4 +1,3 @@
-# handlers/fun.py
 import logging
 import aiohttp
 from telegram import Update
@@ -49,7 +48,7 @@ FUN_CAPTIONS = {
     "glomp": "{user} tackles {target} in a wild glomp! 💖🏃",
     "slap": "{user} lands a legendary slap on {target}! ✋💥",
     "kill": "{user} obliterates {target} in dramatic fashion! ⚰️💀",
-    "kickk": "{user} boots {target} with a stylish kick! 👢💨",  # Maps to "slap" image
+    "kickk": "{user} boots {target} with a stylish kick! 👢💨",
     "happy": "{user} showers {target} with pure happiness! 🎉😄",
     "wink": "{user} winks at {target} with a sly charm! 😉✨",
     "poke": "{user} pokes {target} for some fun! 👈😆",
@@ -68,6 +67,13 @@ async def generic_fun_command(update: Update, context: ContextTypes.DEFAULT_TYPE
     target = user  # Default to self if no reply
     if update.message.reply_to_message:
         target = update.message.reply_to_message.from_user
+    
+    # Special sigma reply for /kiss on the bot
+    if category == "kiss" and target.id == context.bot.id:
+        await update.message.reply_text(
+            "😏 Oi!nice try you bullshit go fuck off i dont want a kiss iam loyal for my gurl (jaanu)! 💪"
+        )
+        return
     
     # Fetch image from Waifu.pics API
     image_url = await fetch_waifu_image(category)
@@ -95,7 +101,7 @@ FUN_COMMANDS = {
     "kiss": "kiss", "lick": "lick", "pat": "pat", "smug": "smug", "bonk": "bonk",
     "yeet": "yeet", "blush": "blush", "smile": "smile", "wave": "wave",
     "highfive": "highfive", "handhold": "handhold", "nom": "nom", "bite": "bite",
-    "glomp": "glomp", "slap": "slap", "kill": "kill", "kickk": "slap",  # Maps to "slap" category
+    "glomp": "glomp", "slap": "slap", "kill": "kill", "kickk": "slap",
     "happy": "happy", "wink": "wink", "poke": "poke", "dance": "dance", "cringe": "cringe"
 }
 

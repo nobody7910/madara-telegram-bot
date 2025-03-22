@@ -246,13 +246,14 @@ async def fonts_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         return
     text = " ".join(context.args)
     context.user_data["font_text"] = text  # Store the text in user_data
-    await show_font_page(update, context, text, page=1)
+    await show_font_page(update, context, text, page=0)  # Start at page 0
 
 async def show_font_page(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str, page: int) -> None:
     font_keys = list(FONTS.keys())
     per_page = 12
     total_pages = (len(font_keys) + per_page - 1) // per_page
-    start_idx = (page - 1) * per_page
+    page = max(0, min(page, total_pages - 1))  # Clamp page number
+    start_idx = page * per_page
     end_idx = min(start_idx + per_page, len(font_keys))
 
     keyboard = []
@@ -263,20 +264,21 @@ async def show_font_page(update: Update, context: ContextTypes.DEFAULT_TYPE, tex
         ]
         keyboard.append(row)
 
+    # Navigation buttons
     nav_row = []
-    if page > 1:
-        nav_row.append(InlineKeyboardButton("⬅️ Back", callback_data=f"font_page_{page-1}_{text}"))
+    if page > 0:
+        nav_row.append(InlineKeyboardButton("◀ Back", callback_data=f"font_page_{page-1}_{text}"))
     else:
-        nav_row.append(InlineKeyboardButton(" ", callback_data="noop"))
+        nav_row.append(InlineKeyboardButton("◀", callback_data="noop"))
     nav_row.append(InlineKeyboardButton("❌ Close", callback_data="font_close"))
-    if page < total_pages:
-        nav_row.append(InlineKeyboardButton("Forward ➡️", callback_data=f"font_page_{page+1}_{text}"))
+    if page < total_pages - 1:
+        nav_row.append(InlineKeyboardButton("Forward ▶", callback_data=f"font_page_{page+1}_{text}"))
     else:
-        nav_row.append(InlineKeyboardButton(" ", callback_data="noop"))
+        nav_row.append(InlineKeyboardButton("▶", callback_data="noop"))
     keyboard.append(nav_row)
 
     reply_markup = InlineKeyboardMarkup(keyboard)
-    msg_text = f"🖋️ Select a font to style your text: *{text}*"
+    msg_text = f"🖋️ Select a font to style: *{text}*\nPage {page + 1}/{total_pages}"
     if update.callback_query:
         await update.callback_query.edit_message_text(msg_text, reply_markup=reply_markup, parse_mode="Markdown")
     else:
@@ -292,8 +294,9 @@ async def font_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         return
 
     if data.startswith("font_page_"):
-        page = int(data.split("_")[2])
-        text = data.split("_")[3]
+        parts = data.split("_", 3)
+        page = int(parts[2])
+        text = parts[3]
         await show_font_page(update, context, text, page)
         await query.answer()
         return
@@ -309,19 +312,19 @@ async def font_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     # Check if this font was already applied
     last_font = context.user_data.get("last_font_applied", None)
     if last_font == font_type:
-        await query.answer("This font is already applied! Try another one or copy it.", show_alert=True)
+        await query.answer("This font is already applied! Copy it or pick another.", show_alert=True)
         return
 
     converted_text = transform_text(original_text, font_type)
 
     keyboard = [
-        [InlineKeyboardButton("📋 Tap On above text to copy", callback_data=f"font_copy_{converted_text}")],
-        [InlineKeyboardButton("⬅️ Back", callback_data=f"font_page_1_{original_text}"),
+        [InlineKeyboardButton("📋 Tap to Copy", switch_inline_query=converted_text)],
+        [InlineKeyboardButton("⬅️ Back", callback_data=f"font_page_0_{original_text}"),
          InlineKeyboardButton("❌ Close", callback_data="font_close")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    new_text = f"Converted text:\n`{converted_text}`"
+    new_text = f"Converted text:\n`{converted_text}`\n\nTap  TAP ON ABOVE TEXT TO COPY OR FOR SENDING IT TO ANYONE THEN 'Tap to Copy' to copy to your clipboard!"
     
     try:
         await query.edit_message_text(
@@ -329,7 +332,6 @@ async def font_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             reply_markup=reply_markup,
             parse_mode="Markdown"
         )
-        # Store the applied font to prevent redundant edits
         context.user_data["last_font_applied"] = font_type
     except telegram.error.BadRequest as e:
         if "Message is not modified" in str(e):
@@ -339,19 +341,8 @@ async def font_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             await query.answer("Something went wrong. Try again!", show_alert=True)
     await query.answer()
 
-async def font_copy_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    query = update.callback_query
-    data = query.data
-    if data.startswith("font_copy_"):
-        styled_text = data.split("_", 2)[2]
-        context.user_data["clipboard"] = styled_text
-        await query.answer(
-            f"Text copied to bot clipboard: `{styled_text}`\nUse /paste to retrieve it!",
-            show_alert=True
-        )
-
+# Optional: Keep /paste if you want it, but it's less needed now
 async def paste_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Retrieve and send the text stored in the clipboard."""
     clipboard_text = context.user_data.get("clipboard", None)
     if clipboard_text:
         await update.message.reply_text(
@@ -492,3 +483,4 @@ async def handle_filters(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 await message.reply_animation(response.split("GIF: ")[1])
             else:
                 await message.reply_text(response)
+    # No unnecessary replies if no filters match

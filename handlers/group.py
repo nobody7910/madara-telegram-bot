@@ -1,4 +1,3 @@
-# handlers/group.py
 import logging
 import time
 from datetime import datetime, timedelta
@@ -12,10 +11,12 @@ from utils.db import get_db
 
 logger = logging.getLogger(__name__)
 
-# Track messages (unchanged)
+# Track messages (fixed AFK break logic)
 async def track_messages(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat = update.effective_chat
     user = update.effective_user
+    message = update.effective_message
+    
     if chat.type not in ["group", "supergroup"]:
         return
     
@@ -26,7 +27,50 @@ async def track_messages(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     db = get_db()
     message_counts = db.get_collection('message_counts')
     chat_data = db.get_collection('chat_data')
+    afk_users = db.get_collection('afk_users')
     
+    # Check AFK status first
+    afk_record = afk_users.find_one({'chat_id': chat_id, 'user_id': user_id})
+    if afk_record:
+        afk_time = datetime.fromisoformat(afk_record['time'])
+        duration = (datetime.now() - afk_time).total_seconds() // 60  # Duration in minutes
+        afk_reason = afk_record.get('message', 'No reason provided')
+        
+        # Prepare the AFK break message
+        break_message = (
+            f"🎉 Welcome back, {user.first_name}! You were AFK for {int(duration)} mins.\n"
+            f"Last AFK reason: "
+        )
+        
+        # Handle different types of AFK reasons
+        try:
+            if afk_reason.startswith("Sticker:"):
+                sticker_id = afk_reason.split("Sticker: ")[1]
+                await message.reply_text(
+                    break_message + "a sticker (see below)",
+                    reply_to_message_id=message.message_id
+                )
+                await context.bot.send_sticker(chat_id=chat.id, sticker=sticker_id)
+            elif afk_reason.startswith("GIF:"):
+                gif_id = afk_reason.split("GIF: ")[1]
+                await message.reply_text(
+                    break_message + "a GIF (see below)",
+                    reply_to_message_id=message.message_id
+                )
+                await context.bot.send_animation(chat_id=chat.id, animation=gif_id)
+            else:
+                await message.reply_text(
+                    break_message + f"{afk_reason}",
+                    reply_to_message_id=message.message_id
+                )
+        except TelegramError as e:
+            logger.error(f"Error sending AFK break message: {e}")
+        
+        # Remove AFK status
+        afk_users.delete_one({'chat_id': chat_id, 'user_id': user_id})
+        logger.info(f"AFK status cleared for {user_id} in {chat_id}")
+    
+    # Update message count
     message_counts.update_one(
         {'chat_id': chat_id, 'user_id': user_id},
         {
@@ -36,6 +80,7 @@ async def track_messages(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         upsert=True
     )
     
+    # Update chat data
     admins = await chat.get_administrators()
     chat_data.update_one(
         {'chat_id': chat_id},
@@ -49,25 +94,13 @@ async def track_messages(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         },
         upsert=True
     )
-    
-    afk_users = db.get_collection('afk_users')
-    afk_record = afk_users.find_one({'chat_id': chat_id, 'user_id': user_id})
-    if afk_record:
-        afk_time = datetime.fromisoformat(afk_record['time'])
-        duration = (datetime.now() - afk_time).total_seconds() // 60
-        await update.message.reply_text(
-            f"🎉 Welcome back, {user.first_name}! You were AFK for {duration} mins.\n"
-            f"Last AFK reason: {afk_record['message']}"
-        )
-        afk_users.delete_one({'chat_id': chat_id, 'user_id': user_id})
 
-# Welcome new members (unchanged, but called by handle_chat_member too)
+# Welcome new members (unchanged)
 async def welcome_new_member(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat = update.effective_chat
     if chat.type not in ["group", "supergroup"]:
         return
     
-    # Handle both message-based new members and chat member updates
     if update.message and update.message.new_chat_members:
         new_members = update.message.new_chat_members
     elif update.chat_member and update.chat_member.new_chat_member.status in [ChatMember.MEMBER]:
@@ -111,7 +144,7 @@ async def welcome_new_member(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 reply_markup=reply_markup
             )
 
-# Handle chat member updates (added for link joins)
+# Handle chat member updates (unchanged)
 async def handle_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat = update.effective_chat
     if chat.type not in ["group", "supergroup"]:
@@ -124,7 +157,6 @@ async def handle_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if member.is_bot:
         return
 
-    # Detect join via link or manual addition
     if old_status in ["left", "kicked"] and new_status == "member":
         await welcome_new_member(update, context)
 
@@ -776,6 +808,7 @@ async def handle_stat_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         await generate_leaderboard(update, context, chat_id, period)
         await query.answer()
 
+# AFK command (unchanged)
 async def afk_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat = update.effective_chat
     user = update.effective_user
@@ -787,7 +820,13 @@ async def afk_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     user_id = str(user.id)
     afk_msg = " ".join(context.args) or "AFK - Be right back!"
     if update.message.reply_to_message:
-        afk_msg = update.message.reply_to_message.text
+        reply_msg = update.message.reply_to_message
+        if reply_msg.text:
+            afk_msg = reply_msg.text
+        elif reply_msg.sticker:
+            afk_msg = f"Sticker: {reply_msg.sticker.file_id}"
+        elif reply_msg.animation:
+            afk_msg = f"GIF: {reply_msg.animation.file_id}"
     
     db = get_db()
     afk_users = db.get_collection('afk_users')
@@ -797,6 +836,6 @@ async def afk_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         {'$set': {'time': datetime.now().isoformat(), 'message': afk_msg}},
         upsert=True
     )
-    await update.message.reply_text(f"✨ {user.first_name} is now AFK! Reason: {afk_msg}")
+    await update.message.reply_text(f"✨ {user.first_name} is now AFK! Reason: {afk_msg if not afk_msg.startswith(('Sticker:', 'GIF:')) else 'a sticker/GIF'}")
 
 tagging_operations = {}

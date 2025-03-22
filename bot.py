@@ -23,7 +23,7 @@ from handlers.group import (
 from handlers.fun import register_fun_handlers
 from handlers.new_commands import (
     couple_command, whisper_inline, fonts_command, font_callback, filter_command, handle_filters,
-    stop_command, filterlist_command, paste_command, font_copy_callback  # Moved paste_command here, added font_copy_callback
+    stop_command, filterlist_command, paste_command  # Removed font_copy_callback
 )
 
 logging.basicConfig(
@@ -53,7 +53,6 @@ def register_handlers(application):
     application.add_handler(InlineQueryHandler(whisper_inline))
     application.add_handler(CommandHandler(["fonts", "font"], fonts_command))
     application.add_handler(CallbackQueryHandler(font_callback, pattern="^font_"))
-    application.add_handler(CallbackQueryHandler(font_copy_callback, pattern="^font_copy_"))
     application.add_handler(CommandHandler("paste", paste_command))  # Register paste_command
     application.add_handler(CommandHandler("filter", filter_command))
     application.add_handler(CommandHandler("stop", stop_command))
@@ -92,7 +91,6 @@ def register_handlers(application):
     application.add_handler(CallbackQueryHandler(help_command, pattern=r'^(help_|fun_)'))
     application.add_handler(CallbackQueryHandler(commands_menu, pattern=r'^(commands_start_|cmd_)'))
     application.add_handler(CallbackQueryHandler(font_callback, pattern=r'^font_'))
-    application.add_handler(CallbackQueryHandler(font_copy_callback, pattern=r'^font_copy_'))  # Ensure this is present
     application.add_handler(CallbackQueryHandler(lambda update, context: update.callback_query.answer(), pattern=r'^noop$'))
     application.add_handler(CallbackQueryHandler(lambda update, context: update.callback_query.message.delete(), pattern=r'^commands_close$'))
     application.add_handler(CallbackQueryHandler(lambda update, context: start(update, context), pattern=r'^commands_back$'))
@@ -116,4 +114,4 @@ def main() -> None:
 
 if __name__ == '__main__':
     logger.info("Bot script initiated.")
-    main()
+    main() 
